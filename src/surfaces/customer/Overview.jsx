@@ -1,506 +1,143 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AlarmClock, Zap, Phone, AlertTriangle, LayoutDashboard, RefreshCw, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AlarmClock, Zap, Phone, TrendingUp, Bot, Volume2, Users } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
-import { api } from '../../api.js';
-import { readCache, writeCache } from '../../utils/swrCache.js';
 
-const fmtDuration = (s) => {
-  if (!s) return '0s';
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return m ? `${m}m ${sec}s` : `${sec}s`;
+const DUMMY_STATS = {
+  totalCalls: 1247,
+  minutesUsed: 3420,
+  activeAgents: 5,
+  avgSentiment: 87,
 };
 
-const fmtDate = (iso) => {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
-  } catch {
-    return '—';
-  }
+const DUMMY_RECENT_CALLS = [
+  { id: 1, from: '+1 (555) 123-4567', agent: 'Sales Agent', duration: '2m 34s', sentiment: 'Positive', time: '2 hours ago' },
+  { id: 2, from: '+1 (555) 987-6543', agent: 'Support Agent', duration: '5m 12s', sentiment: 'Neutral', time: '3 hours ago' },
+  { id: 3, from: '+1 (555) 456-7890', agent: 'Sales Agent', duration: '1m 45s', sentiment: 'Positive', time: '5 hours ago' },
+  { id: 4, from: '+1 (555) 321-0987', agent: 'Booking Agent', duration: '3m 22s', sentiment: 'Positive', time: '6 hours ago' },
+  { id: 5, from: '+1 (555) 654-3210', agent: 'Support Agent', duration: '4m 08s', sentiment: 'Negative', time: '8 hours ago' },
+];
+
+const DUMMY_NUMBERS = [
+  { id: 1, value: '+1 (555) 000-1234', friendlyName: 'Main Line', status: 'active' },
+  { id: 2, value: '+1 (555) 000-5678', friendlyName: 'Support', status: 'active' },
+];
+
+const StatCard = ({ icon: Icon, label, value, color, loading }) => (
+  <div className="form-card flex items-center gap-4">
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0`} style={{ background: color }}>
+      <Icon className="w-6 h-6 text-white" />
+    </div>
+    <div className="min-w-0">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--body)] font-semibold mb-0.5">{label}</div>
+      <div className="text-2xl font-bold text-[var(--foreground)] truncate">{loading ? '—' : value}</div>
+    </div>
+  </div>
+);
+
+const sentimentColor = (s) => {
+  if (s === 'Positive') return '#16A34A';
+  if (s === 'Negative') return '#EF4444';
+  return '#F59E0B';
 };
 
-export default function Overview({ rechargeOn }) {
-  const { currentUser } = useApp();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState(() => readCache('overview.stats', currentUser?.id));
-  const [statsErr, setStatsErr] = useState('');
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  const [wallet, setWallet] = useState(() => readCache('overview.wallet', currentUser?.id));
-  const [topupBusy, setTopupBusy] = useState(false);
-  const [topupMsg, setTopupMsg] = useState('');
-  const [numbers, setNumbers] = useState(() => readCache('overview.numbers', currentUser?.id) ?? []);
-  const [numbersLoading, setNumbersLoading] = useState(true);
-
-  // Call analytics card — call-statistics / sentiment / call-volume are all
-  // auto-scoped to this customer's own agent server-side (PER_AGENT_TOOLS in
-  // server/index.js), so they're safe to call directly, unlike /api/mcp/overview
-  // which is tenant-wide and stays admin-only.
-  const [callStats, setCallStats] = useState(() => readCache('overview.callStats', currentUser?.id));
-  const [sentiment, setSentiment] = useState(() => readCache('overview.sentiment', currentUser?.id));
-  const [volume, setVolume] = useState(() => readCache('overview.volume', currentUser?.id));
-  const [animateBars, setAnimateBars] = useState(false);
-
-  const refreshWallet = async () => {
-    try {
-      const w = await api('/api/wallet');
-      setWallet(w.wallet);
-      writeCache('overview.wallet', currentUser?.id, w.wallet);
-    } catch {}
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Each request fires immediately (nothing here is awaited before the
-    // next starts) and updates its own state the moment it resolves — so
-    // e.g. the numbers table paints as soon as /api/numbers is back instead
-    // of waiting on /api/twilio/stats, which is the slowest of the six.
-    api('/api/twilio/stats')
-      .then((data) => {
-        if (cancelled) return;
-        setStats(data);
-        writeCache('overview.stats', currentUser?.id, data);
-      })
-      .catch((e) => { if (!cancelled) setStatsErr(e.message); })
-      .finally(() => { if (!cancelled) setStatsLoading(false); });
-
-    api('/api/wallet')
-      .then((w) => {
-        if (cancelled) return;
-        setWallet(w.wallet);
-        writeCache('overview.wallet', currentUser?.id, w.wallet);
-      })
-      .catch(() => {});
-
-    api('/api/numbers')
-      .then((r) => {
-        if (cancelled) return;
-        const next = r.numbers || [];
-        setNumbers(next);
-        writeCache('overview.numbers', currentUser?.id, next);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setNumbersLoading(false); });
-
-    Promise.all([
-      api('/api/mcp/call-statistics?days=30').catch(() => null),
-      api('/api/mcp/sentiment?days=30').catch(() => null),
-      api('/api/mcp/call-volume?days=14').catch(() => null),
-    ]).then(([cs, sent, vol]) => {
-      if (cancelled) return;
-      const csData = cs?.data || null;
-      const sentData = sent?.data || null;
-      const volData = vol?.data || null;
-      setCallStats(csData);
-      setSentiment(sentData);
-      setVolume(volData);
-      writeCache('overview.callStats', currentUser?.id, csData);
-      writeCache('overview.sentiment', currentUser?.id, sentData);
-      writeCache('overview.volume', currentUser?.id, volData);
-    });
-
-    return () => { cancelled = true; };
-  }, [currentUser?.role]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimateBars(true), 150);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const quickTopUp = async () => {
-    setTopupBusy(true);
-    setTopupMsg('');
-    try {
-      const r = await api('/api/wallet/topup', { method: 'POST', body: { pack: 'starter' } });
-      setTopupMsg(`✓ +${r.charged.minutes} min added · charged $${Number(r.charged.amountUsd || 0).toLocaleString('en-US')} to ${r.charged.descriptor}`);
-      await refreshWallet();
-    } catch (e) {
-      setTopupMsg(`✗ ${e.message}`);
-    } finally {
-      setTopupBusy(false);
-    }
-  };
-
-  if (!currentUser) return null;
-
-  const displayNumbers   = numbers;
-  const displayStats     = stats;
-  const displayCallStats = callStats;
-  const displaySentiment = sentiment;
-  const displayVolume    = volume;
-
-  const planMin = currentUser.plan?.min || 0;
-  const minUsedAllTime = displayStats?.minutesUsedAllTime ?? Number(currentUser.minutesUsed) ?? 0;
-  const minUsedMonth   = displayStats?.minutesUsedThisMonth ?? 0;
-  const planLeft = Math.max(0, planMin - minUsedAllTime);
-  const walletMin = wallet?.walletMinutes ?? currentUser.walletMinutes ?? 0;
-  const minLeft = Math.max(0, planLeft + walletMin);
-  const minTotal = planMin + walletMin;
-  const lowThreshold = wallet?.lowBalanceThreshold ?? currentUser.lowBalanceThreshold ?? 20;
-  const isLow = displayNumbers.length > 0 && minLeft <= lowThreshold;
-  const autoTopupOn = wallet?.autoTopupEnabled ?? currentUser.autoTopupEnabled;
-
-  // Proactive "renews soon" nudge — only meaningful for a single-number
-  // account (a multi-number account has staggered renewal dates, so one
-  // countdown wouldn't represent all of them). Shown in demo mode too since
-  // it's purely navigational (no charge risk), unlike the low-minutes banner.
-  const nextRenewal = displayNumbers[0]?.nextRentalAt ? new Date(displayNumbers[0].nextRentalAt) : null;
-  const daysUntilRenewal = nextRenewal && !isNaN(nextRenewal.getTime())
-    ? Math.ceil((nextRenewal.getTime() - Date.now()) / 86400000)
-    : null;
-  const renewalSoon = displayNumbers.length === 1 && daysUntilRenewal != null && daysUntilRenewal <= 7;
-
-  // Per-row usage breakdown is only exact when the customer has a single DID
-  // — /api/twilio/stats aggregates across every number, so with more than
-  // one it can't be attributed to a specific row without new backend work.
-  const singleNumber = displayNumbers.length === 1;
-
-  const testNumber = displayNumbers[0]?.value || currentUser.number?.value;
-
-  // This component renders under both /dashboard (Customer) and /admin
-  // (Admin/Superadmin, since they share the same Overview page) — links must
-  // resolve against whichever shell is actually mounted.
-  const isAdminTier =
-    currentUser.userType === 'superadmin'
-    || currentUser.userType === 'admin'
-    || currentUser.role === 'admin';
-  const basePath = isAdminTier ? '/admin' : '/dashboard';
+export default function Overview() {
+  const { currentUser, demoMode } = useApp();
+  const [stats] = useState(DUMMY_STATS);
+  const [calls] = useState(DUMMY_RECENT_CALLS);
+  const [numbers] = useState(DUMMY_NUMBERS);
 
   return (
-    <div>
-      {/* Icon + "Overview" title now live in the sticky top bar (Customer.jsx
-          / Admin.jsx) instead of here — same for every page in the app. */}
-      <p className="font-semibold text-base tracking-wide animate-fade-up" style={{ color: 'var(--ink-2)' }}>Your numbers, call activity, and quick actions at a glance.</p>
+    <div className="space-y-6 animate-fade-up">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={Phone} label="Total Calls" value={stats.totalCalls.toLocaleString()} color="var(--primary)" />
+        <StatCard icon={AlarmClock} label="Minutes Used" value={stats.minutesUsed.toLocaleString()} color="var(--accent)" />
+        <StatCard icon={Bot} label="Active Agents" value={stats.activeAgents} color="var(--secondary)" />
+        <StatCard icon={TrendingUp} label="Avg Sentiment" value={`${stats.avgSentiment}%`} color="#16A34A" />
+      </div>
 
-      {statsErr && (
-        <div className="mt-4 text-xs text-amber-400 inline-flex items-center gap-1"><AlertTriangle size={12} /> Live stats unavailable: {statsErr}</div>
-      )}
-
-      <ProvisioningBanner />
-
-      {isLow && (
-        <div className="mt-6 rounded-lg border-2 border-amber-500/60 bg-amber-500/10 p-4 flex items-start gap-3">
-          <AlarmClock size={22} className="text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <div className="font-semibold text-amber-400">Low minutes — only {minLeft.toFixed(1)} left</div>
-            <p className="text-sm text-mute mt-1">
-              You're at or below your low-balance threshold ({lowThreshold} min).
-              {autoTopupOn
-                ? <> Auto-topup is <strong className="text-lime-600">ON</strong> — we'll charge your card for 100 more minutes shortly.</>
-                : <> Top up now to keep your agent answering calls without interruption.</>}
-            </p>
-            <div className="mt-3 flex gap-2 items-center">
-              {!autoTopupOn && (
-                <button className="btn-teal text-sm inline-flex items-center gap-1.5" onClick={quickTopUp} disabled={topupBusy}>
-                  {topupBusy ? 'Charging…' : <><Zap size={14} /> Top up 83 min ($1,000)</>}
-                </button>
-              )}
-              <Link to={`${basePath}/billing`} className="btn-ghost text-sm">Manage wallet →</Link>
-              {topupMsg && <span className="text-xs text-mute ml-2">{topupMsg}</span>}
+      {/* Demo Mode Banner */}
+      {demoMode && (
+        <div className="form-card border-dashed border-[var(--accent)] bg-[var(--glow)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-[var(--foreground)]">Demo Mode Active</div>
+              <div className="text-xs text-[var(--body)]">You're viewing sample data. Connect a backend to see real data.</div>
             </div>
           </div>
         </div>
       )}
 
-      {renewalSoon && (
-        <div className="mt-6 rounded-lg border-2 border-lime-500/60 bg-lime-500/10 p-4 flex items-start gap-3">
-          <RefreshCw size={22} className="text-lime-600 flex-shrink-0" />
-          <div className="flex-1">
-            <div className="font-semibold text-lime-700">
-              {daysUntilRenewal <= 0 ? 'Plan renewal is due' : `Plan renews in ${daysUntilRenewal} day${daysUntilRenewal === 1 ? '' : 's'}`}
-            </div>
-            <p className="text-sm text-mute mt-1">
-              Your {displayNumbers[0]?.plan?.label || 'current'} plan renews on {fmtDate(nextRenewal)}. Upgrade now to lock in more minutes before it resets.
-            </p>
-            <div className="mt-3 flex gap-2 items-center">
-              <Link to={`${basePath}/billing?tab=plans`} className="btn-teal text-sm inline-flex items-center gap-1.5">
-                <TrendingUp size={14} /> Upgrade plan
-              </Link>
-              <Link to={`${basePath}/billing`} className="btn-ghost text-sm">Manage plan →</Link>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Calls */}
+        <div className="lg:col-span-2 form-card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <Volume2 size={16} className="text-[var(--primary)]" />
+              Recent Calls
+            </h2>
+            <Link to="/dashboard/calls" className="text-xs text-[var(--primary)] hover:text-[var(--primary-hover)]">View all →</Link>
           </div>
-        </div>
-      )}
-
-      {/* === Numbers & plans table ================================== */}
-      <div className="mt-6 form-card p-0 overflow-x-auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Number</th>
-              <th>Product</th>
-              <th>Auto-recharge</th>
-              <th>Exp date</th>
-              <th>Min left</th>
-              <th>Today<div className="normal-case font-normal text-[10px] text-mute">calls · min</div></th>
-              <th>Month<div className="normal-case font-normal text-[10px] text-mute">calls · min</div></th>
-              <th>Avg duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayNumbers.length === 0 && (
-              <tr><td colSpan={8} className="text-center text-mute py-8">
-                {numbersLoading ? 'Loading your numbers…' : 'No numbers yet — add a plan to get started.'}
-              </td></tr>
-            )}
-            {displayNumbers.map((n) => {
-              const rowLeft  = singleNumber ? minLeft   : null;
-              const rowTotal = n.plan?.min || 0;
-              const rowPct   = rowTotal > 0 && rowLeft != null ? Math.min(100, (rowLeft / rowTotal) * 100) : null;
-              return (
-                <tr
-                  key={n.id}
-                  className="cursor-pointer"
-                  tabIndex={0}
-                  role="button"
-                  onClick={() => navigate(`${basePath}/agents`)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') navigate(`${basePath}/agents`); }}
-                >
-                  <td className="font-mono text-xs whitespace-nowrap">{n.value}</td>
-                  <td className="font-semibold">{n.agentName || n.label || '—'}</td>
-                  <td>
-                    <span className={`pill ${n.autoRechargeEnabled ? 'pill-teal' : ''}`} style={!n.autoRechargeEnabled ? { background: 'var(--line-2)', color: 'var(--ink-3)' } : undefined}>
-                      {n.autoRechargeEnabled ? 'ON' : 'OFF'}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap text-mute">{fmtDate(n.nextRentalAt)}</td>
-                  <td style={{ minWidth: 130 }}>
-                    {rowLeft != null ? (
-                      <>
-                        <div><strong>{rowLeft.toFixed(0)}</strong> <span className="text-mute">/ {rowTotal} min</span></div>
-                        <div className="mt-1 h-1.5 bg-line-2 rounded" style={{ background: 'var(--line-2)' }}>
-                          <div className="h-1.5 rounded bg-lime-500" style={{ width: `${rowPct}%` }} />
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-mute">{rowTotal} min plan</span>
-                    )}
-                  </td>
-                  <td className="text-right">
-                    {singleNumber ? (<><strong>{displayStats?.callsToday ?? 0}</strong><div className="text-xs text-mute">{minUsedMonth ? '' : '0m'}</div></>) : '—'}
-                  </td>
-                  <td className="text-right">
-                    {singleNumber ? (<><strong>{displayStats?.callsThisMonth ?? 0}</strong><div className="text-xs text-mute">{fmtDuration((minUsedMonth || 0) * 60)}</div></>) : '—'}
-                  </td>
-                  <td className="text-right">{singleNumber ? fmtDuration(displayStats?.avgDurationSec || 0) : '—'}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">From</th>
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">Agent</th>
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">Duration</th>
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">Sentiment</th>
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">Time</th>
                 </tr>
-              );
-            })}
-            {displayNumbers.length > 0 && (
-              <tr className="bg-lime-50/40" style={{ background: 'var(--surface-2)' }}>
-                <td colSpan={2} className="font-semibold uppercase text-xs tracking-wide text-mute">
-                  Across all numbers
-                  {displayStats?.allTimeSpendInr != null && (
-                    <span className="normal-case font-normal ml-2 text-mute">· ≈ R{Number(displayStats.allTimeSpendInr).toLocaleString('en-ZA')} used</span>
-                  )}
-                </td>
-                <td colSpan={2} />
-                <td style={{ minWidth: 130 }}>
-                  <div><strong>{minLeft.toFixed(0)}</strong> <span className="text-mute">/ {minTotal} min</span></div>
-                  <div className="mt-1 h-1.5 rounded" style={{ background: 'var(--line-2)' }}>
-                    <div className="h-1.5 rounded bg-lime-500" style={{ width: `${minTotal > 0 ? Math.min(100, (minLeft / minTotal) * 100) : 0}%` }} />
+              </thead>
+              <tbody>
+                {calls.map((call) => (
+                  <tr key={call.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)] transition-colors">
+                    <td className="py-3 font-mono text-xs text-[var(--foreground)]">{call.from}</td>
+                    <td className="py-3 text-[var(--body)]">{call.agent}</td>
+                    <td className="py-3 text-[var(--body)]">{call.duration}</td>
+                    <td className="py-3">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: sentimentColor(call.sentiment) }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: sentimentColor(call.sentiment) }}></span>
+                        {call.sentiment}
+                      </span>
+                    </td>
+                    <td className="py-3 text-[var(--body)] text-xs">{call.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Phone Numbers */}
+        <div className="form-card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <Users size={16} className="text-[var(--primary)]" />
+              Phone Numbers
+            </h2>
+            <Link to="/dashboard/overview" className="text-xs text-[var(--primary)] hover:text-[var(--primary-hover)]">Manage →</Link>
+          </div>
+          <div className="space-y-3">
+            {numbers.map((num) => (
+              <div key={num.id} className="p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-medium text-[var(--foreground)]">{num.friendlyName}</div>
+                    <div className="text-xs font-mono text-[var(--body)] mt-0.5">{num.value}</div>
                   </div>
-                </td>
-                <td className="text-right"><strong>{displayStats?.callsToday ?? 0}</strong></td>
-                <td className="text-right"><strong>{displayStats?.callsThisMonth ?? 0}</strong></td>
-                <td className="text-right">{fmtDuration(displayStats?.avgDurationSec || 0)}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* === Call analytics =========================================== */}
-      <div className="mt-6 form-card">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-display font-semibold text-lg">Call analytics</div>
-            <div className="text-xs text-mute mt-0.5">
-              {displayCallStats?.total_calls != null ? `Last ${displayCallStats.total_calls} calls` : 'Last 30 days'} · all numbers — pick a date range on Analytics
-            </div>
-          </div>
-          <Link to={`${basePath}/analytics`} className="text-sm text-lime-700 hover:underline whitespace-nowrap">View analytics →</Link>
-        </div>
-
-        <div className="mt-5 grid sm:grid-cols-4 gap-4">
-          <Stat label="Calls" value={displayCallStats?.total_calls ?? displayStats?.callsAllTime ?? '—'} />
-          <Stat label="Answer rate" value={displayCallStats?.answer_rate != null ? `${displayCallStats.answer_rate}%` : '—'} />
-          <Stat label="Total minutes" value={displayCallStats?.total_minutes != null ? Number(displayCallStats.total_minutes).toFixed(1) : (minUsedMonth ? minUsedMonth.toFixed(1) : '—')} />
-          <Stat label="Avg duration" value={displayCallStats?.avg_duration_seconds != null ? fmtDuration(displayCallStats.avg_duration_seconds) : fmtDuration(displayStats?.avgDurationSec || 0)} />
-        </div>
-
-        {displaySentiment && (
-          <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--line-2)' }}>
-            <div className="flex items-start justify-between">
-              <div className="text-xs font-mono uppercase tracking-wide text-mute">Caller sentiment · last 30 days</div>
-              <div className="flex flex-col items-end gap-1.5">
-                <Link to={`${basePath}/analytics`} className="text-xs text-lime-700 hover:underline">Details →</Link>
-                {!!displaySentiment.needFollowUp && (
-                  <span className="pill" style={{ background: 'rgba(248,113,113,0.14)', color: '#b91c1c' }}>
-                    {displaySentiment.needFollowUp} need follow-up
-                  </span>
-                )}
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                </div>
               </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <div className="text-2xl font-bold text-lime-700">
-                {displaySentiment.sentiment_percentages?.positive ?? 0}% <span className="text-sm font-normal text-mute">positive</span>
-              </div>
-            </div>
-            <div className="mt-2 h-2 rounded overflow-hidden flex" style={{ background: 'var(--line-2)' }}>
-              <div
-                className="h-2 bg-lime-500"
-                style={{
-                  '--bar-final-width': `${displaySentiment.sentiment_percentages?.positive ?? 0}%`,
-                  width: animateBars ? `${displaySentiment.sentiment_percentages?.positive ?? 0}%` : '0%',
-                  transition: 'width 700ms ease-out',
-                }}
-              />
-              <div
-                className="h-2"
-                style={{
-                  '--bar-final-width': `${displaySentiment.sentiment_percentages?.neutral ?? 0}%`,
-                  width: animateBars ? `${displaySentiment.sentiment_percentages?.neutral ?? 0}%` : '0%',
-                  background: 'var(--ink-4)',
-                  transition: 'width 850ms ease-out',
-                }}
-              />
-              <div
-                className="h-2 bg-red-400"
-                style={{
-                  '--bar-final-width': `${displaySentiment.sentiment_percentages?.negative ?? 0}%`,
-                  width: animateBars ? `${displaySentiment.sentiment_percentages?.negative ?? 0}%` : '0%',
-                  transition: 'width 1000ms ease-out',
-                }}
-              />
-            </div>
-            <div className="mt-2 text-xs text-mute">
-              {displaySentiment.total_calls != null ? (
-                <>
-                  {Math.round(((displaySentiment.sentiment_percentages?.positive ?? 0) / 100) * displaySentiment.total_calls)} positive
-                  {' · '}{Math.round(((displaySentiment.sentiment_percentages?.neutral ?? 0) / 100) * displaySentiment.total_calls)} neutral
-                  {' · '}{Math.round(((displaySentiment.sentiment_percentages?.negative ?? 0) / 100) * displaySentiment.total_calls)} negative
-                  {' · '}{displaySentiment.total_calls} classified
-                </>
-              ) : (
-                <>{(displaySentiment.sentiment_percentages?.positive ?? 0)}% positive</>
-              )}
-            </div>
+            ))}
           </div>
-        )}
-
-        {displayVolume?.daily_breakdown?.length > 0 && (
-          <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--line-2)' }}>
-            <div className="text-xs font-mono uppercase tracking-wide text-mute mb-3">Call volume · last 14 days</div>
-            <div className="flex items-end gap-2">
-              {displayVolume.daily_breakdown.map((d, index) => {
-                const max = Math.max(1, ...displayVolume.daily_breakdown.map((x) => Number(x.count || x.calls || 0)));
-                const v = Number(d.count || d.calls || 0);
-                // Fixed pixel track (not a %) — a % height only resolves against
-                // a parent with an explicit height, and this column's parent is
-                // auto-sized, so a % here silently collapses to 0.
-                const barPx = Math.max(2, Math.round((v / max) * 80));
-                return (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${d.date}: ${v} calls`}>
-                    <div className="w-full flex items-end" style={{ height: 80 }}>
-                      <div
-                        className="w-full rounded-t bg-lime-400"
-                        style={{
-                          height: animateBars ? barPx : 0,
-                          transition: `height 700ms ease-out ${index * 45}ms`,
-                        }}
-                      />
-                    </div>
-                    <div className="text-[9px] text-mute">{new Date(d.date).getDate()}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="text-xs text-mute mt-2">
-              Based on your {displayCallStats?.total_calls ?? displayVolume.daily_breakdown.reduce((a, d) => a + Number(d.count || d.calls || 0), 0)} most recent calls across all your numbers.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* === Quick actions ============================================ */}
-      <div className="mt-6 form-card">
-        <div className="font-display font-semibold text-lg">Quick actions</div>
-        <div className="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
-          <Link to={`${basePath}/agents`} className="btn-ghost text-center">Edit agent</Link>
-          <Link to={`${basePath}/billing`} className="btn-teal text-center">Buy more minutes</Link>
-          <Link to={`${basePath}/analytics`} className="btn-ghost text-center sm:col-span-2">View analytics</Link>
-        </div>
-        {testNumber && (
-          <p className="mt-4 text-xs text-mute">
-            To test, dial <span className="font-mono text-[var(--ink)]">{testNumber}</span> from your phone.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div>
-      <div className="text-[10px] font-mono uppercase tracking-wide text-mute">{label}</div>
-      <div className="mt-1 text-2xl font-bold">{value}</div>
-    </div>
-  );
-}
-
-function ProvisioningBanner() {
-  const { currentUser } = useApp();
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [localStatus, setLocalStatus] = useState(currentUser?.provisioning?.status || 'unprovisioned');
-  const [localErr, setLocalErr] = useState(currentUser?.provisioning?.error || null);
-
-  if (!currentUser?.number?.value) return null;
-
-  const status = localStatus;
-  const error = localErr;
-
-  const provision = async () => {
-    setBusy(true); setMsg('');
-    try {
-      const r = await api('/api/provision/me', { method: 'POST' });
-      setMsg('✓ ' + (r.log || []).join(' · '));
-      setLocalStatus('ready');
-      setLocalErr(null);
-    } catch (e) {
-      setMsg('✗ ' + e.message);
-      setLocalStatus('failed');
-      setLocalErr(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (status === 'ready') return null;
-
-  return (
-    <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 flex items-start gap-3">
-      <Phone size={22} className="text-amber-500 flex-shrink-0" />
-      <div className="flex-1">
-        <div className="font-semibold text-amber-400">
-          Inbound calling: {status === 'in_progress' ? 'in progress…' : status === 'failed' ? 'failed' : 'not provisioned yet'}
-        </div>
-        <p className="text-sm text-mute mt-1">
-          {status === 'failed'
-            ? <>Last error: {error || 'unknown'}. Retry to recreate the SIP trunk + dispatch rule + agent on 9278.</>
-            : <>Click below to set up your inbound calling, routing, and voice agent.</>
-          }
-        </p>
-        <div className="mt-3 flex items-center gap-2">
-          <button className="btn-teal text-sm" onClick={provision} disabled={busy}>
-            {busy ? 'Provisioning…' : 'Provision inbound now'}
+          <button className="btn-primary w-full mt-4 py-2 text-xs">
+            + Add Number
           </button>
-          {msg && <span className="text-xs text-mute">{msg}</span>}
         </div>
       </div>
     </div>

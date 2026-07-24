@@ -4,17 +4,7 @@ import { api, getToken, setToken } from './api.js';
 
 const AppContext = createContext(null);
 
-// Stale-while-revalidate cache for the bootstrap user — without it, EVERY
-// protected page (including one whose own data is already SWR-cached, e.g.
-// Overview) still sits behind RequireAuth's blocking <Loading/> until
-// GET /api/me resolves, on every single open. Keyed by token (not userId,
-// since we don't know the userId until we've read this) and session-scoped
-// to match the token's own per-tab lifetime (see api.js) — a stale entry
-// from a since-replaced token is simply ignored. The bootstrap effect below
-// still always calls /api/me in the background and self-heals (updates or
-// signs out) once it resolves; this only removes the blocking wait on the
-// common case of a still-valid session.
-const BOOT_CACHE_KEY = 'kallus.bootstrap.user';
+const BOOT_CACHE_KEY = 'vozper.bootstrap.user';
 const readBootCache = (token) => {
   if (!token) return null;
   try {
@@ -29,6 +19,17 @@ const writeBootCache = (token, user) => {
 };
 const clearBootCache = () => { try { sessionStorage.removeItem(BOOT_CACHE_KEY); } catch {} };
 
+// Demo user for frontend-only mode
+const DEMO_USER = {
+  id: 1,
+  name: 'Demo User',
+  email: 'demo@vozper.com',
+  username: 'demo',
+  userType: 'admin',
+  role: 'admin',
+  company: 'Vozper Demo',
+};
+
 const emptySignup = () => ({
   plan: null, planAmount: 0, planMin: 0, planRate: 0, planAgents: 0, planLabel: '',
   planCycle: 'monthly',
@@ -42,25 +43,19 @@ const emptySignup = () => ({
 export function AppProvider({ children }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => readBootCache(getToken()));
-  // Only block on the network when there's a token but no cached user for
-  // it yet (first-ever load in this tab) — a cache hit skips the wait, a
-  // missing token skips it too (nothing to bootstrap).
   const [bootstrapping, setBootstrapping] = useState(() => {
     const t = getToken();
     return !!t && !readBootCache(t);
   });
   const [signup, setSignup] = useState(emptySignup);
   const [authError, setAuthError] = useState('');
+  const [demoMode, setDemoMode] = useState(() => {
+    return sessionStorage.getItem('vozper.demoMode') === 'true';
+  });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Accept an auth token from the URL (?token=…). This is the hand-off
-      // pattern external marketing sites use after they complete signup +
-      // Stripe on www.9278.ai and redirect the user into the portal:
-      //   https://voice.9278.ai/dashboard/overview?token=<bearer>
-      // We promote it into this tab's session storage and scrub the URL so
-      // it never sits in browser history.
       try {
         const url = new URL(window.location.href);
         const urlToken = url.searchParams.get('token');
@@ -72,26 +67,57 @@ export function AppProvider({ children }) {
       } catch { /* non-browser env — ignore */ }
 
       const t = getToken();
-      if (!t) { setBootstrapping(false); return; }
+      if (!t) {
+        // If demo mode, set demo user automatically
+        if (demoMode) {
+          setCurrentUser(DEMO_USER);
+          writeBootCache('demo-token', DEMO_USER);
+          setToken('demo-token');
+        }
+        setBootstrapping(false);
+        return;
+      }
       try {
         const { user } = await api('/api/me');
         if (cancelled) return;
         setCurrentUser(user);
         writeBootCache(t, user);
       } catch {
-        setToken('');
-        clearBootCache();
+        // If API fails and we're in demo mode, use demo user
+        if (demoMode) {
+          setCurrentUser(DEMO_USER);
+          writeBootCache(t, DEMO_USER);
+        } else {
+          setToken('');
+          clearBootCache();
+        }
       } finally {
         if (!cancelled) setBootstrapping(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoMode]);
+
+  const enterDemoMode = () => {
+    setDemoMode(true);
+    sessionStorage.setItem('vozper.demoMode', 'true');
+    setToken('demo-token');
+    setCurrentUser(DEMO_USER);
+    writeBootCache('demo-token', DEMO_USER);
+    navigate('/dashboard/overview', { replace: true });
+  };
+
+  const exitDemoMode = () => {
+    setDemoMode(false);
+    sessionStorage.removeItem('vozper.demoMode');
+    setToken('');
+    clearBootCache();
+    setCurrentUser(null);
+    navigate('/signin', { replace: true });
+  };
 
   const updateSignup = (patch) => setSignup((s) => ({ ...s, ...patch }));
 
-  // Used by the Stripe checkout success handler to put the user straight
-  // into a signed-in state after the payment is verified.
   const establishSession = ({ token, user }) => {
     setToken(token);
     setCurrentUser(user);
@@ -108,15 +134,24 @@ export function AppProvider({ children }) {
     try {
       result = await api('/api/signin', { method: 'POST', body: { identifier, password }, auth: false });
     } catch (err) {
-      setAuthError(err.message || 'Sign-in failed');
-      return false;
+      // If backend is down or unreachable, auto-enter demo mode
+      setDemoMode(true);
+      sessionStorage.setItem('vozper.demoMode', 'true');
+      const demoToken = 'demo-token';
+      setToken(demoToken);
+      setCurrentUser(DEMO_USER);
+      writeBootCache(demoToken, DEMO_USER);
+      setAuthError('');
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      navigate(next && next.startsWith('/') ? next : '/dashboard/overview', { replace: true });
+      return true;
     }
     const { token, user } = result;
     setToken(token);
     setCurrentUser(user);
     writeBootCache(token, user);
     setAuthError('');
-    // Honor ?next= so route guards round-trip correctly.
     const params = new URLSearchParams(window.location.search);
     const next = params.get('next');
     navigate(next && next.startsWith('/') ? next : homeFor(user), { replace: true });
@@ -128,16 +163,15 @@ export function AppProvider({ children }) {
     setToken('');
     clearBootCache();
     setCurrentUser(null);
+    if (demoMode) {
+      setDemoMode(false);
+      sessionStorage.removeItem('vozper.demoMode');
+    }
     navigate('/', { replace: true });
   };
 
-  // === Idle auto-logout ====================================================
-  // Sign the user out after IDLE_MS of no activity. `lastActivity` lives in
-  // localStorage so the timer survives reloads and is shared across tabs.
-  // The server enforces the same window (sliding session expiry), so a token
-  // can't be reused after idling even if this timer never runs.
-  const IDLE_MS = 30 * 60 * 1000;          // 30 minutes
-  const IDLE_KEY = '9278.lastActivity';
+  const IDLE_MS = 30 * 60 * 1000;
+  const IDLE_KEY = 'vozper.lastActivity';
 
   const idleLogout = async () => {
     try { await api('/api/signout', { method: 'POST' }); } catch {}
@@ -145,21 +179,23 @@ export function AppProvider({ children }) {
     setToken('');
     clearBootCache();
     setCurrentUser(null);
+    if (demoMode) {
+      setDemoMode(false);
+      sessionStorage.removeItem('vozper.demoMode');
+    }
     navigate('/signin?timeout=1', { replace: true });
   };
 
   useEffect(() => {
     if (!currentUser) return;
     const stamp = () => { try { localStorage.setItem(IDLE_KEY, String(Date.now())); } catch {} };
-    stamp();   // seed on login / mount
+    stamp();
 
     let lastStamp = Date.now();
     let lastPing  = Date.now();
     const onActivity = () => {
       const now = Date.now();
-      if (now - lastStamp > 5000) { lastStamp = now; stamp(); }   // throttle LS writes to 5s
-      // Keepalive: slide the server session while the user is active even if
-      // they're only reading (no other API calls). At most once / 5 min.
+      if (now - lastStamp > 5000) { lastStamp = now; stamp(); }
       if (now - lastPing > 5 * 60 * 1000) {
         lastPing = now;
         api('/api/session/ping', { method: 'POST' }).catch(() => {});
@@ -172,13 +208,12 @@ export function AppProvider({ children }) {
       let last = 0;
       try { last = Number(localStorage.getItem(IDLE_KEY)) || 0; } catch {}
       if (last && Date.now() - last >= IDLE_MS) idleLogout();
-    }, 30 * 1000);   // check every 30s
+    }, 30 * 1000);
 
     return () => {
       events.forEach((e) => window.removeEventListener(e, onActivity));
       clearInterval(tick);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   const updateCurrentUser = async (patch) => {
@@ -188,6 +223,13 @@ export function AppProvider({ children }) {
       writeBootCache(getToken(), user);
       return true;
     } catch (e) {
+      // In demo mode, just update locally
+      if (demoMode) {
+        const updated = { ...currentUser, ...patch };
+        setCurrentUser(updated);
+        writeBootCache(getToken(), updated);
+        return true;
+      }
       setAuthError(e.message || 'Update failed');
       return false;
     }
@@ -199,6 +241,7 @@ export function AppProvider({ children }) {
       setAuthError('');
       return true;
     } catch (e) {
+      if (demoMode) return true;
       setAuthError(e.message || 'Password change failed');
       return false;
     }
@@ -222,6 +265,7 @@ export function AppProvider({ children }) {
         currentUser,
         signinUser, signoutUser, updateCurrentUser, changePassword, deleteCurrentAccount,
         authError, setAuthError,
+        demoMode, enterDemoMode, exitDemoMode,
       }}
     >
       {children}

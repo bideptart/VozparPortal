@@ -8,10 +8,13 @@ import { useApp } from '../../AppContext.jsx';
 // AddNumberModal is used directly by this file's own "+ Add plan / number"
 // button on every tab, so Numbers.jsx is loaded eagerly either way — no
 // point lazy-wrapping its default export too.
-import Numbers, { AddNumberModal } from './Numbers.jsx';
 import Logo from '../../components/Logo.jsx';
 import Footer from '../../components/Footer.jsx';
 import BookingIcon from '../../components/BookingIcon.jsx';
+
+// Lazy load Numbers to avoid crashing on API failures in demo mode
+const NumbersLazy = lazy(() => import('./Numbers.jsx'));
+const AddNumberModalLazy = lazy(() => import('./Numbers.jsx').then(m => ({ default: m.AddNumberModal })));
 
 // Every tab body is its own chunk — a visitor on Overview never downloads
 // Billing/Templates/Playground code, and vice versa.
@@ -72,7 +75,7 @@ const CALL_ACTIVITY_CHILDREN = [
 // shown in the sidebar) so any existing bookmark or deep link still
 // resolves instead of bouncing to Overview.
 const LEGACY_TABS = [
-  { id: 'numbers',      label: 'Plan and Numbers',   Component: Numbers },
+  { id: 'numbers',      label: 'Plan and Numbers',   Component: NumbersLazy },
   { id: 'recordings',   label: 'Recordings',         Component: Recordings },
   { id: 'meetings',     label: 'Scheduled meetings', Component: Meetings },
   // Reached by clicking a row on the Agents list — not a nav item itself.
@@ -86,15 +89,14 @@ const LEGACY_TABS = [
 const TABS = [...NAV_TABS, CALL_ACTIVITY, ...CALL_ACTIVITY_CHILDREN, ...LEGACY_TABS];
 
 export default function Customer() {
-  const { currentUser, signoutUser } = useApp();
+  const { currentUser, signoutUser, demoMode } = useApp();
   const { tab } = useParams();
   const [navOpen, setNavOpen] = useState(false);
-  const [navCollapsed, setNavCollapsed] = useState(false);   // desktop-only: hides the sidebar entirely
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
   const callActivityActive = tab === CALL_ACTIVITY.id || CALL_ACTIVITY_CHILDREN.some((t) => t.id === tab);
   const [callActivityOpen, setCallActivityOpen] = useState(callActivityActive);
 
-  // Close drawer when route changes
   useEffect(() => { setNavOpen(false); }, [tab]);
 
   const [scrollPct, setScrollPct] = useState(0);
@@ -114,31 +116,35 @@ export default function Customer() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [tab]);
 
-  // Auto-expand the group whenever navigation lands on it or one of its children.
   useEffect(() => { if (callActivityActive) setCallActivityOpen(true); }, [callActivityActive]);
 
-  if (!currentUser) return null;
+  const DEMO_USER = {
+    id: 1, name: 'Demo User', email: 'demo@vozper.com', username: 'demo',
+    userType: 'admin', role: 'admin', company: 'Vozper Demo',
+  };
+  const user = currentUser || (demoMode ? DEMO_USER : null);
+  if (!user) return null;
 
   const active = TABS.find((t) => t.id === tab);
   if (!active) return <Navigate to="/dashboard/overview" replace />;
   const Component = active.Component;
 
-  const numberDisplay = currentUser.number?.value || '— no number yet —';
-  const company = currentUser.company || currentUser.name || 'Your account';
+  const numberDisplay = user.number?.value || '— no number yet —';
+  const company = user.company || user.name || 'Your account';
 
   return (
     <div className={`dashboard-shell ${navCollapsed ? 'nav-collapsed' : ''}`}>
       {navOpen && <div className="mobile-nav-backdrop" onClick={() => setNavOpen(false)} />}
 
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
-        <div className="h-16 flex items-center gap-1.5 px-3 bg-white sticky top-0 z-30">
-          <Link to="/dashboard/overview" className="flex items-center gap-2 min-w-0" aria-label="kallus.io home">
-            <Logo size={36} showWordmark={false} />
-            <span className="font-mono text-sm lowercase text-mute tracking-tight whitespace-nowrap">kallus.io</span>
+        <div className="h-16 flex items-center gap-1.5 px-3 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]">
+          <Link to="/dashboard/overview" className="flex items-center gap-2 min-w-0" aria-label="vozper.com home">
+            <Logo size={36} showWordmark={false} white />
+            <span className="font-mono text-sm lowercase text-[var(--body)] tracking-tight whitespace-nowrap">vozper.com</span>
           </Link>
           <button
             type="button"
-            className="hidden lg:inline-flex ml-auto shrink-0 w-6 h-6 items-center justify-center rounded-md text-mute hover:bg-slate-100 hover:text-slate-900 text-xs"
+            className="hidden lg:inline-flex ml-auto shrink-0 w-6 h-6 items-center justify-center rounded-md text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] text-xs"
             onClick={() => setNavCollapsed(true)}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
@@ -149,11 +155,11 @@ export default function Customer() {
 
         {/* Persistent "Welcome back" line — replaces the per-page Overview
             heading so it stays visible across every dashboard tab. */}
-        <div className="px-4 pt-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-          <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">
+        <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">
             Welcome back
           </div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+          <div className="mt-0.5 text-sm font-semibold text-[var(--foreground)] truncate">
             {company}
           </div>
         </div>
@@ -210,7 +216,7 @@ export default function Customer() {
           </Link>
         ))}
 
-        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="mt-2 pt-2 border-t border-[var(--border)]">
           <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
             <DoorOpen size={16} strokeWidth={2} /> Log out
           </button>
@@ -225,7 +231,7 @@ export default function Customer() {
             widget here anymore (removed on request) — Sign Out, My Profile,
             Change Password, and Add Minutes are no longer reachable from
             the UI; Account settings still work via the Account nav tab. */}
-        <div className="relative sticky top-0 z-30 bg-white -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-slate-200 mb-6">
+        <div className="relative sticky top-0 z-30 bg-[var(--popover)] -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-[var(--border)] mb-6">
           <button
             className="mobile-nav-toggle lg:hidden"
             onClick={() => setNavOpen(true)}
@@ -261,7 +267,7 @@ export default function Customer() {
                 </span>
               </>
             )}
-            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-slate-900 lg:dark:text-slate-100 truncate">
+            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-[var(--body)] lg:text-[var(--foreground)] truncate">
               {active.label}
             </h1>
           </div>
@@ -285,11 +291,13 @@ export default function Customer() {
       </div>
 
       {showAddPlan && (
-        <AddNumberModal
-          currentUser={currentUser}
+        <Suspense fallback={null}>
+          <AddNumberModalLazy
+          currentUser={user}
           onClose={() => setShowAddPlan(false)}
           onAdded={() => setShowAddPlan(false)}
         />
+        </Suspense>
       )}
     </div>
   );

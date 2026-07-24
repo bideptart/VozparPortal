@@ -3,14 +3,8 @@ import { useApp } from '../AppContext.jsx';
 import Logo from './Logo.jsx';
 
 export default function Header() {
-  const { currentUser, signoutUser } = useApp();
+  const { currentUser, signoutUser, demoMode, exitDemoMode } = useApp();
   const { pathname } = useLocation();
-  // Customer/admin dashboards have their own top-right user widget (TopBar)
-  // and their own sidebar with branding, so the global header would be a
-  // duplicate "Sign out" + avatar chip. Hide it there.
-  // Signin is the only public route left and it has no public CTAs (signup
-  // happens off-platform on www.9278.ai/get-started), so hide the header there
-  // too — the form fills the page and doesn't need a global nav above it.
   if (
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/admin') ||
@@ -19,9 +13,6 @@ export default function Header() {
     pathname.startsWith('/terms') ||
     pathname.startsWith('/privacy')
   ) return null;
-  // Pick the natural home per tier — superadmin/admin → /admin, reseller →
-  // /reseller, otherwise customer dashboard. Used by the unreachable logo
-  // click here on public pages, but kept aligned with the rest of the app.
   const home = !currentUser
     ? '/'
     : currentUser.userType === 'reseller'
@@ -40,35 +31,50 @@ export default function Header() {
         </Link>
 
         <div className="flex items-center gap-2">
+          {demoMode && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-dashed border-[var(--accent)] bg-[var(--glow)] text-[var(--accent)] text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>
+              Demo Mode
+            </div>
+          )}
           {currentUser ? (
             <>
-              <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm">
+              <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--card)] shadow-sm">
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white"
                   style={{
-                    background: 'linear-gradient(135deg, var(--grad-start), var(--grad-end))',
+                    background: 'linear-gradient(135deg, #046BD2, #0086F9)',
                   }}
                 >
                   {initials}
                 </div>
                 <div className="leading-tight text-right">
-                  <div className="text-xs font-semibold text-slate-900">{currentUser.name || currentUser.username}</div>
-                  <div className="text-[10px] text-mute">
+                  <div className="text-xs font-semibold text-[var(--foreground)]">{currentUser.name || currentUser.username}</div>
+                  <div className="text-[10px] text-[var(--body)]">
                     {currentUser.role === 'admin' ? 'Admin' : (currentUser.company || 'Customer')}
                   </div>
                 </div>
               </div>
-              <button
-                onClick={signoutUser}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-sm"
-              >
-                Sign out
-              </button>
+              {demoMode ? (
+                <button
+                  onClick={exitDemoMode}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-[var(--border)] bg-[var(--card)] text-[var(--body)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] shadow-sm"
+                >
+                  Exit Demo
+                </button>
+              ) : (
+                <button
+                  onClick={signoutUser}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-[var(--border)] bg-[var(--card)] text-[var(--body)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] shadow-sm"
+                >
+                  Sign out
+                </button>
+              )}
             </>
           ) : (
             <>
               <Link to="/signin" className="nav-link">Sign in</Link>
-              <Link to="/signup/plan" className="btn-teal text-sm py-2 px-4">
+              <Link to="/signup/plan" className="btn-primary text-sm py-2 px-4">
                 Get started →
               </Link>
             </>

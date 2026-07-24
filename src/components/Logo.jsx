@@ -1,50 +1,39 @@
-// KallUS brand mark — an audio-waveform "equalizer" icon (bars of varying
-// height) flanked by two curved bracket shapes suggesting sound/voice,
-// paired with the "KallUS" wordmark.
+// Rozper brand mark — ascending bar chart icon (shortest to tallest)
+// with the "Vozper" wordmark.
 //
 // `size` accepts 'sm' | 'md' | 'lg' or a literal pixel height for the icon.
-// `white` renders the icon in mint and the wordmark in white, for dark
-// backgrounds; otherwise the icon renders in deep green and the wordmark in
-// the standard ink color.
-function WaveIcon({ height, color }) {
-  const bars = [8, 15, 21, 15, 9, 17, 12];
-  const barWidth = 3.6;
-  const gap = 2.6;
-  const barsWidth = bars.length * barWidth + (bars.length - 1) * gap;
-  const midY = 20;
-  const barsStartX = 13;
-  const width = barsStartX * 2 + barsWidth;
+// `white` renders the icon in light colors and the wordmark in white, for dark
+// backgrounds; otherwise the icon renders in the standard brand colors.
+function BarChartIcon({ height, color }) {
+  const barColors = color === 'white'
+    ? ['#16A34A', '#EF4444', '#F5B400']
+    : ['#00AA4A', '#FF3F30', '#FEBD01'];
 
   return (
     <svg
       height={height}
-      viewBox={`0 0 ${width} 40`}
+      viewBox="0 0 40 40"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      {/* Left bracket "((" */}
-      <path
-        d="M9 8 C 3.5 13.5, 3.5 26.5, 9 32"
-        stroke={color} strokeWidth="2.6" strokeLinecap="round" fill="none"
-      />
-      {/* Equalizer bars */}
-      {bars.map((h, i) => (
-        <rect
-          key={i}
-          x={barsStartX + i * (barWidth + gap)}
-          y={midY - h / 2}
-          width={barWidth}
-          height={h}
-          rx={barWidth / 2}
-          fill={color}
-        />
-      ))}
-      {/* Right bracket "))" */}
-      <path
-        d={`M${width - 9} 8 C ${width - 3.5} 13.5, ${width - 3.5} 26.5, ${width - 9} 32`}
-        stroke={color} strokeWidth="2.6" strokeLinecap="round" fill="none"
-      />
+      {/* R mark — blue */}
+      <text
+        x="2"
+        y="28"
+        fontFamily="Archivo, sans-serif"
+        fontWeight="800"
+        fontSize="22"
+        fill={color === 'white' ? '#FFFFFF' : '#0086F9'}
+      >
+        R
+      </text>
+      {/* Bar 1 — green (shortest) */}
+      <rect x="24" y="28" width="4" height="8" rx="1" fill={barColors[0]} />
+      {/* Bar 2 — red (middle) */}
+      <rect x="30" y="20" width="4" height="16" rx="1" fill={barColors[1]} />
+      {/* Bar 3 — yellow (tallest) */}
+      <rect x="36" y="8" width="4" height="28" rx="1" fill={barColors[2]} />
     </svg>
   );
 }
@@ -54,12 +43,11 @@ export default function Logo({ size = 'md', white = false, showWordmark = true }
     ? size
     : size === 'lg' ? 52 : size === 'sm' ? 30 : 40;
 
-  const iconColor = white ? '#9fe6b8' : '#6fa524';
-  const wordmarkColor = white ? '#ffffff' : 'var(--ink)';
+  const wordmarkColor = white ? '#ffffff' : 'var(--foreground)';
 
   return (
     <div className="flex items-center gap-2.5 select-none max-w-full" style={{ height: h }}>
-      <WaveIcon height={h * 0.72} color={iconColor} />
+      <BarChartIcon height={h * 0.72} color={white ? 'white' : 'default'} />
       {showWordmark && (
         <span
           className="font-display leading-none"
@@ -70,7 +58,7 @@ export default function Logo({ size = 'md', white = false, showWordmark = true }
             color: wordmarkColor,
           }}
         >
-          KallUS
+          Vozper
         </span>
       )}
     </div>
