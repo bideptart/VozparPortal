@@ -162,6 +162,13 @@ p {
     background: var(--glow);
     color: var(--primary);
     border: 1px solid rgba(4,107,210,0.22);
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+  }
+  .pill-primary:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 14px var(--glow);
   }
 
   /* === CARDS ===================================================== */

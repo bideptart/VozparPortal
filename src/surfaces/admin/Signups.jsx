@@ -76,7 +76,7 @@ export default function Signups() {
           <h1 className="text-2xl font-bold">Signups</h1>
           <p className="text-mute">Every customer who completed signup — with every DID + plan they bought.</p>
         </div>
-        <button className="btn-ghost text-sm" onClick={load}>↻ Refresh</button>
+        <button className="btn-ghost text-sm flex items-center gap-1" onClick={load}>↻ <span className="pill pill-primary">Refresh</span></button>
       </div>
 
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}

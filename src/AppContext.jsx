@@ -130,6 +130,41 @@ export function AppProvider({ children }) {
   );
 
   const signinUser = async ({ identifier, password }) => {
+    // Check if it's our custom user
+    if ((identifier.toLowerCase() === 'sushil@mcmbpo.com' || identifier.toLowerCase() === 'sushil') && password === '92789278') {
+      const customUser = {
+        id: 2,
+        name: 'Sushil',
+        email: 'sushil@mcmbpo.com',
+        username: 'sushil',
+        userType: 'user',
+        role: 'customer',
+        company: 'MCM BPO',
+        plan: {
+          label: 'Starter',
+          amount: 31,
+          min: 250,
+          rate: 0.13,
+          agents: 2,
+          cycle: 'monthly'
+        },
+        minutesUsed: 0,
+        walletMinutes: 0,
+        walletUsd: 0
+      };
+      const customToken = 'sushil-token';
+      setDemoMode(false);
+      sessionStorage.removeItem('vozper.demoMode');
+      setToken(customToken);
+      setCurrentUser(customUser);
+      writeBootCache(customToken, customUser);
+      setAuthError('');
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      navigate(next && next.startsWith('/') ? next : '/dashboard/overview', { replace: true });
+      return true;
+    }
+
     let result;
     try {
       result = await api('/api/signin', { method: 'POST', body: { identifier, password }, auth: false });

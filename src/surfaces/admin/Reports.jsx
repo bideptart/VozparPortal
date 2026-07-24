@@ -240,8 +240,8 @@ export default function Reports() {
                 >
                   ⬇ Export
                 </button>
-                <button className="btn-ghost text-xs py-1.5 px-3" onClick={() => load({ force: true })} disabled={loading}>
-                  {loading ? 'Loading…' : '↻ Refresh'}
+                <button className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1" onClick={() => load({ force: true })} disabled={loading}>
+                  {loading ? 'Loading…' : <>↻ <span className="pill pill-primary">Refresh</span></>}
                 </button>
               </div>
             </div>
