@@ -90,11 +90,11 @@ export default function Signups() {
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
       <div className="mt-6 grid sm:grid-cols-5 gap-3">
-        <div className="form-card"><div className="text-xs text-mute uppercase">Total customers</div><div className="mt-1 text-2xl font-semibold">{stats?.customers ?? '—'}</div></div>
-        <div className="form-card"><div className="text-xs text-mute uppercase">Last 24 hr</div><div className="mt-1 text-2xl font-semibold">{stats?.signupsLast24h ?? '—'}</div></div>
-        <div className="form-card"><div className="text-xs text-mute uppercase">Last 7 days</div><div className="mt-1 text-2xl font-semibold">{stats?.signupsLast7d ?? '—'}</div></div>
-        <div className="form-card"><div className="text-xs text-mute uppercase">Live (with #)</div><div className="mt-1 text-2xl font-semibold text-lime-400">{liveCount}</div></div>
-        <div className="form-card"><div className="text-xs text-mute uppercase">Plans sold</div><div className="mt-1 text-2xl font-semibold text-lime-400">{totalDids}</div></div>
+        <div className="form-card"><div className="text-xs text-mute uppercase">Total customers</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{stats?.customers ?? '—'}</div></div>
+        <div className="form-card"><div className="text-xs text-mute uppercase">Last 24 hr</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{stats?.signupsLast24h ?? '—'}</div></div>
+        <div className="form-card"><div className="text-xs text-mute uppercase">Last 7 days</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{stats?.signupsLast7d ?? '—'}</div></div>
+        <div className="form-card"><div className="text-xs text-mute uppercase">Live (with #)</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{liveCount}</div></div>
+        <div className="form-card"><div className="text-xs text-mute uppercase">Plans sold</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{totalDids}</div></div>
       </div>
 
       <div className="mt-6 form-card p-0 overflow-x-auto">

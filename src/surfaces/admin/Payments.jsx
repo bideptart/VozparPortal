@@ -89,10 +89,10 @@ export default function Payments() {
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
       <div className="mt-6 grid sm:grid-cols-4 gap-4">
-        <div className="form-card"><div className="text-sm text-mute">MRR (total)</div><div className="mt-1 text-2xl font-semibold text-lime-400">{localMrr ? fmtCurrency(localMrr.total) : '—'}</div></div>
-        <div className="form-card"><div className="text-sm text-mute">From plans</div><div className="mt-1 text-2xl font-semibold">{localMrr ? fmtCurrency(localMrr.plans) : '—'}</div></div>
-        <div className="form-card"><div className="text-sm text-mute">From number rentals</div><div className="mt-1 text-2xl font-semibold">{localMrr ? fmtCurrency(localMrr.numbers) : '—'}</div></div>
-        <div className="form-card"><div className="text-sm text-mute">Active subscriptions</div><div className="mt-1 text-2xl font-semibold">{stats?.customers ?? '—'}</div></div>
+        <div className="form-card"><div className="text-sm text-mute">MRR (total)</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{localMrr ? fmtCurrency(localMrr.total) : '—'}</div></div>
+        <div className="form-card"><div className="text-sm text-mute">From plans</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{localMrr ? fmtCurrency(localMrr.plans) : '—'}</div></div>
+        <div className="form-card"><div className="text-sm text-mute">From number rentals</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{localMrr ? fmtCurrency(localMrr.numbers) : '—'}</div></div>
+        <div className="form-card"><div className="text-sm text-mute">Active subscriptions</div><div className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{stats?.customers ?? '—'}</div></div>
       </div>
 
       <h2 className="mt-10 text-lg font-semibold">Per-customer recurring</h2>
