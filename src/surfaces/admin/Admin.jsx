@@ -232,19 +232,14 @@ export default function Admin() {
           {/* Page icon + title, sourced from the same nav-tab lookup that
               drives the sidebar — was previously duplicated as a big heading
               inside every page component; lives once, here, for every tab.
-              One <h1> in the DOM at every width (not two elements toggled by
-              visibility — that would leave zero h1s on mobile). Below `lg`
-              the "Menu" button plus the right-side actions leave very little
-              room, so the icon shrinks to inline and the title drops back to
-              the small uppercase label the mobile header always used. */}
-          <div className="lg:flex-1 flex items-center gap-1.5 lg:gap-2.5 lg:min-w-0">
+              One badge + one <h1>, always rendered (no breakpoint toggling
+              between two icon variants) so the icon is never conditionally
+              missing at any width. */}
+          <div className="lg:flex-1 flex items-center gap-2 lg:gap-2.5 lg:min-w-0">
             {ActiveIcon && (
-              <>
-                <ActiveIcon size={14} strokeWidth={2} className="lg:hidden shrink-0" />
-                <span className="hidden lg:flex w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
-                  <ActiveIcon className="w-4 h-4" />
-                </span>
-              </>
+              <span className="flex w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
+                <ActiveIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />
+              </span>
             )}
             <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-slate-900 lg:dark:text-slate-100 truncate">
               {activeLabel}
