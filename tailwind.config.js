@@ -7,24 +7,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Rozper Brand Colors (Dark Navy Theme)
+        // shadcn/ui colors (adapted to Vozper theme)
+        border: '#1A2638',
+        input: 'rgba(255,255,255,0.07)',
+        ring: '#046BD2',
+        background: '#0B1220',
+        foreground: '#FFFFFF',
         primary: {
           DEFAULT: '#046BD2',
-          hover: '#0078E0',
-          pressed: '#045CB4',
+          foreground: '#FFFFFF',
         },
-        secondary: '#2575FC',
-        accent: '#0086F9',
+        secondary: {
+          DEFAULT: '#2575FC',
+          foreground: '#FFFFFF',
+        },
+        destructive: {
+          DEFAULT: '#FF4444',
+          foreground: '#FFFFFF',
+        },
+        muted: {
+          DEFAULT: 'rgba(255,255,255,0.05)',
+          foreground: '#CCD6DF',
+        },
+        accent: {
+          DEFAULT: '#0086F9',
+          foreground: '#FFFFFF',
+        },
+        popover: {
+          DEFAULT: '#111B2D',
+          foreground: '#FFFFFF',
+        },
+        card: {
+          DEFAULT: 'rgba(255,255,255,0.04)',
+          foreground: '#FFFFFF',
+        },
+        // Additional Vozper colors
         link: '#22D3EE',
-        background: '#0B1220',
-        popover: '#111B2D',
-        border: '#1A2638',
-        foreground: '#FFFFFF',
         body: '#CCD6DF',
-        destructive: '#FF4444',
-        card: 'rgba(255,255,255,0.04)',
-        muted: 'rgba(255,255,255,0.05)',
-        input: 'rgba(255,255,255,0.07)',
         glow: 'rgba(4,107,210,0.35)',
         'glow-strong': 'rgba(4,107,210,0.6)',
         chart: {
