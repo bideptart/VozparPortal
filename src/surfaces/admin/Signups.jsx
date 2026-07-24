@@ -76,7 +76,15 @@ export default function Signups() {
           <h1 className="text-2xl font-bold">Signups</h1>
           <p className="text-mute">Every customer who completed signup — with every DID + plan they bought.</p>
         </div>
-        <button className="btn-ghost text-sm flex items-center gap-1" onClick={load}>↻ <span className="pill pill-primary">Refresh</span></button>
+        <button 
+          className="flex items-center justify-center w-10 h-10 rounded-full border border-[var(--primary)] bg-[var(--glow)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white hover:shadow-lg transition-all duration-300"
+          onClick={load}
+          title="Refresh signups"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
       </div>
 
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}

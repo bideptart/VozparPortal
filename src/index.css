@@ -541,6 +541,12 @@ p {
   }
   .animate-shake { animation: shake .4s ease-in-out both; }
 
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .animate-spin { animation: spin 1s linear infinite; }
+
   @keyframes import-glow {
     0%, 100% { border-color: var(--border); }
     50%      { border-color: var(--primary); }

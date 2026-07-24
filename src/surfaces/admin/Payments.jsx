@@ -75,8 +75,14 @@ export default function Payments() {
       {/* Icon + "Billing & minutes" title now live in the sticky top bar instead of here. */}
       <div className="flex items-center justify-between">
         <p className="text-base font-semibold tracking-wide animate-fade-up" style={{ color: 'var(--ink-2)' }}>Recurring revenue across every plan a customer is on — one row per DID.</p>
-        <button className="btn-teal text-sm transition duration-200 ease-out hover:scale-105 active:scale-95 flex items-center gap-2" onClick={load}>
-          ↻ <span className="pill pill-primary">Refresh</span>
+        <button 
+          className="flex items-center justify-center w-10 h-10 rounded-full border border-[var(--primary)] bg-[var(--glow)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white hover:shadow-lg transition-all duration-300"
+          onClick={load}
+          title="Refresh data"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
         </button>
       </div>
 
