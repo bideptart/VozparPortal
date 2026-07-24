@@ -276,7 +276,7 @@ export default function Customer() {
           <div className="ml-auto flex items-center gap-3">
             <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowAddPlan(true)}>+ Add plan / number</button>
           </div>
-          <div className="absolute left-0 bottom-0 h-[3px] bg-lime-500 transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
+          <div className="absolute left-0 bottom-0 h-[3px] bg-[var(--primary)] transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
         </div>
 
         <Suspense fallback={<div className="text-sm text-mute py-10 text-center">Loading…</div>}>
