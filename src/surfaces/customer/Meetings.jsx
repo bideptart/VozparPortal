@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 
@@ -354,8 +355,8 @@ export default function Meetings({
             />
             Upcoming only
           </label>
-          <button onClick={() => load()} disabled={refreshing} className="btn-teal text-sm transition duration-200 ease-out hover:scale-105 active:scale-95">
-            {refreshing ? 'Loading…' : '↻ Refresh'}
+          <button onClick={() => load()} disabled={refreshing} className="btn-refresh">
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? 'Loading…' : 'Refresh'}
           </button>
         </div>
       </div>

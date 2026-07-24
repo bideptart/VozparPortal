@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import {
-  LayoutDashboard, Bot, FlaskConical, BookOpen, TrendingUp, Zap,
-  FileText, CreditCard, Receipt, User, UserCircle, Menu, Wrench, Ticket, DoorOpen, Tag,
+  CreditCard, Receipt, User, UserCircle, Menu, Wrench, DoorOpen, Tag,
   List, Terminal, Server, Check, Copy, ChevronDown, ChevronUp,
+  UserPlus, Users, AlertTriangle, Building2, DollarSign, Activity, HeartPulse, RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
@@ -11,7 +11,6 @@ import { readCache, writeCache } from '../../utils/swrCache.js';
 import { AddNumberModal } from '../customer/Numbers.jsx';
 import Logo from '../../components/Logo.jsx';
 import Footer from '../../components/Footer.jsx';
-import BookingIcon from '../../components/BookingIcon.jsx';
 
 // Every tab body is its own chunk — a visitor on Overview never downloads
 // Settings/Bulk-import/Plans code, and vice versa.
@@ -26,6 +25,7 @@ const Plans = lazy(() => import('./Plans.jsx'));
 const Settings = lazy(() => import('./Settings.jsx'));
 const Account = lazy(() => import('../customer/Account.jsx'));
 const Reports = lazy(() => import('./Reports.jsx'));
+const CustomersAtRisk = lazy(() => import('./CustomersAtRisk.jsx'));
 const Overview = lazy(() => import('../customer/Overview.jsx'));
 const AgentsList = lazy(() => import('../customer/AgentsList.jsx'));
 const AgentDetail = lazy(() => import('../customer/AgentDetail.jsx'));
@@ -41,21 +41,21 @@ const TicketDetail = lazy(() => import('../customer/TicketDetail.jsx'));
 const Tools = lazy(() => import('../customer/Tools.jsx'));
 const KnowledgeBase = lazy(() => import('../customer/KnowledgeBase.jsx'));
 
-// Sidebar nav — unified across Admin/Customer to a common shape. Each entry
-// maps onto the closest existing admin page; some concepts still don't have
-// a dedicated admin screen and share a page with a nearby entry instead.
-// Split around "Call Activity" so the collapsible group renders inline,
-// right where the flat "Call Activity" entry used to sit (between Analytics
-// and Reports) instead of at the end of the list.
-const NAV_TABS_BEFORE_CALLS = [
-  { id: 'overview',    label: 'Overview',       Icon: LayoutDashboard },
-  { id: 'agents',      label: 'Agents',         Icon: Bot },
-  { id: 'playground',  label: 'Playground',     Icon: FlaskConical },
-  { id: 'kb',          label: 'Knowledge Base', Icon: BookOpen },
-  { id: 'analytics',   label: 'Analytics',      Icon: TrendingUp },
+// Sidebar nav — the primary "Manage" section is business/ops-focused (this
+// tier manages the platform, it doesn't run its own agents), followed by a
+// secondary platform-tools section. Each entry maps onto an existing admin
+// page; "Customers at Risk" is the one genuinely new screen (churn/overage
+// signals derived from the same user data Customers/Signups already load).
+const NAV_TABS_PRIMARY = [
+  { id: 'signups',        label: 'Signups',            Icon: UserPlus },
+  { id: 'customers',      label: 'Customers',          Icon: Users },
+  { id: 'customers-risk', label: 'Customers at Risk',  Icon: AlertTriangle },
+  { id: 'resellers',      label: 'Reseller',           Icon: Building2 },
+  { id: 'payments',       label: 'Price & Revenue',    Icon: DollarSign },
+  { id: 'logs',           label: 'Activity Log',       Icon: Activity },
+  { id: 'health',         label: 'System Health',      Icon: HeartPulse },
 ];
-const NAV_TABS_AFTER_CALLS = [
-  { id: 'reports',      label: 'Reports',           Icon: FileText },
+const NAV_TABS_SECONDARY = [
   { id: 'billing',      label: 'Billing & minutes', Icon: CreditCard },
   { id: 'pricing',      label: 'Plans & pricing',   Icon: Tag },
   { id: 'transactions', label: 'Transactions',      Icon: Receipt },
@@ -72,33 +72,26 @@ const NAV_TABS_AFTER_CALLS = [
   { id: 'mcp',          label: 'MCP Browser',       Icon: Terminal },
   { id: 'settings',     label: 'Settings',          Icon: UserCircle },
 ];
-const NAV_TABS = [...NAV_TABS_BEFORE_CALLS, ...NAV_TABS_AFTER_CALLS];
+const NAV_TABS = [...NAV_TABS_PRIMARY, ...NAV_TABS_SECONDARY];
 
-// "Call Activity" is a collapsible sidebar group: its own page (Logs) plus
-// three sub-pages that nest under it. "Tools" reuses the same card-grid
-// Tools page as the customer dashboard; the MCP tool browser stays
-// reachable at its legacy /admin/mcp link (distinct from the "Playground"
-// nav entry above, which is the agent test/tune page shared with Customer).
-const CALL_ACTIVITY = { id: 'calls', label: 'Call Activity', Icon: Zap };
-const CALL_ACTIVITY_CHILDREN = [
-  { id: 'booking-history', label: 'Booking History', Icon: BookingIcon },
-  { id: 'tools',           label: 'Tools',           Icon: Wrench },
-  { id: 'tickets',         label: 'Tickets',         Icon: Ticket },
-];
-
-// Legacy tab ids from the previous Operations/Reports/Setup layout — kept
-// valid (but not shown in the sidebar) so any existing bookmark or deep link
-// still resolves to the right page instead of 404ing. Text-only (no icon —
-// they never render in the Side loop, just the mobile page-title fallback).
+// Legacy tab ids from previous sidebar layouts — kept valid (but not shown
+// in the sidebar) so any existing bookmark or deep link still resolves to
+// the right page instead of 404ing. Text-only (no icon — they never render
+// in the Side loop, just the mobile page-title fallback).
 const LEGACY_TABS = [
-  { id: 'signups',      label: 'Signups' },
-  { id: 'customers',    label: 'Customers' },
+  { id: 'overview',    label: 'Overview' },
+  { id: 'agents',      label: 'Agents' },
+  { id: 'playground',  label: 'Playground' },
+  { id: 'kb',          label: 'Knowledge Base' },
+  { id: 'analytics',   label: 'Analytics' },
+  { id: 'calls',       label: 'Call Activity' },
+  { id: 'reports',     label: 'Reports' },
+  { id: 'booking-history', label: 'Booking History' },
+  { id: 'tools',           label: 'Tools' },
+  { id: 'tickets',         label: 'Tickets' },
   { id: 'resellers',    label: 'Resellers' },
-  { id: 'payments',     label: 'Payments & revenue' },
   { id: 'bulk',         label: 'Bulk import' },
-  { id: 'logs',         label: 'Activity logs' },
   { id: 'usage',        label: 'Usage analytics' },
-  { id: 'health',       label: 'System health' },
   { id: 'plans',        label: 'Plans & pricing' },
   // 'profile' was its own nav tab until Account absorbed it — keep the id
   // valid so old links/bookmarks land on Account instead of bouncing to
@@ -115,16 +108,11 @@ const LEGACY_TABS = [
 
 const VALID_TABS = new Set([
   // NAV_TABS
-  'overview', 'agents', 'playground', 'kb', 'analytics',
-  'reports', 'billing', 'pricing', 'transactions', 'account', 
-  'numbers', 'mcp', 'settings',
-  // CALL_ACTIVITY
-  'calls',
-  // CALL_ACTIVITY_CHILDREN
-  'booking-history', 'tools', 'tickets',
+  'signups', 'customers', 'customers-risk', 'resellers', 'payments', 'logs', 'health',
+  'billing', 'pricing', 'transactions', 'account', 'numbers', 'mcp', 'settings',
   // LEGACY_TABS
-  'signups', 'customers', 'resellers', 'payments', 'bulk', 
-  'logs', 'usage', 'health', 'plans', 'profile', 
+  'overview', 'agents', 'playground', 'kb', 'analytics', 'calls', 'reports',
+  'booking-history', 'tools', 'tickets', 'bulk', 'usage', 'plans', 'profile',
   'agent-detail', 'agent-detail-chat', 'templates', 'ticket-detail'
 ]);
 
@@ -137,8 +125,6 @@ export default function Admin() {
   const isAdminTier = currentUser?.userType === 'admin';
   const [navCollapsed, setNavCollapsed] = useState(false);   // desktop-only: hides the sidebar entirely
   const [showAddPlan, setShowAddPlan] = useState(false);
-  const callActivityActive = tab === CALL_ACTIVITY.id || CALL_ACTIVITY_CHILDREN.some((t) => t.id === tab);
-  const [callActivityOpen, setCallActivityOpen] = useState(callActivityActive);
 
   useEffect(() => { setNavOpen(false); }, [tab]);
 
@@ -158,9 +144,8 @@ export default function Admin() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, [tab]);
-  useEffect(() => { if (callActivityActive) setCallActivityOpen(true); }, [callActivityActive]);
 
-  if (!VALID_TABS.has(tab)) return <Navigate to="/admin/overview" replace />;
+  if (!VALID_TABS.has(tab)) return <Navigate to="/admin/signups" replace />;
 
   const Side = ({ list }) => list.map((t) => (
     <Link
@@ -172,7 +157,7 @@ export default function Admin() {
     </Link>
   ));
 
-  const activeTab = [...NAV_TABS, CALL_ACTIVITY, ...CALL_ACTIVITY_CHILDREN, ...LEGACY_TABS].find((t) => t.id === tab);
+  const activeTab = [...NAV_TABS, ...LEGACY_TABS].find((t) => t.id === tab);
   const activeLabel = activeTab?.label || '';
   const ActiveIcon = activeTab?.Icon;
 
@@ -198,45 +183,25 @@ export default function Admin() {
             </button>
           )}
         </div>
-        <div className="px-4 pb-3 border-t border-slate-100 pt-3">
-          {/* The role appeared twice here — a plain "ADMIN" caption above the
-              email and a pill below it. Keep the pill (it carries the actual
-              role, not a hardcoded label) and move it above the email. */}
-          <span className="pill pill-teal inline-block">{currentUser?.role || 'Admin'}</span>
-          <div className="text-sm font-semibold text-slate-900 mt-2 break-all">{currentUser?.email || ''}</div>
-        </div>
-        <div className="sidenav-section">Manage</div>
-        <Side list={NAV_TABS_BEFORE_CALLS} />
+        <div className="sidenav-scroll">
+          <div className="px-4 pb-3 border-t border-slate-100 pt-3">
+            {/* The role appeared twice here — a plain "ADMIN" caption above the
+                email and a pill below it. Keep the pill (it carries the actual
+                role, not a hardcoded label) and move it above the email. */}
+            <span className="pill pill-teal inline-block">{currentUser?.role || 'Admin'}</span>
+            <div className="text-sm font-semibold text-slate-900 mt-2 break-all">{currentUser?.email || ''}</div>
+          </div>
+          <div className="sidenav-section">Manage</div>
+          <Side list={NAV_TABS_PRIMARY} />
 
-        <div className="nav-group">
-          <button
-            type="button"
-            onClick={() => setCallActivityOpen((v) => !v)}
-            className={`nav-group-toggle ${tab === CALL_ACTIVITY.id ? 'active' : ''}`}
-            aria-expanded={callActivityOpen}
-          >
-            <CALL_ACTIVITY.Icon size={16} strokeWidth={2} />
-            <span className="flex-1">{CALL_ACTIVITY.label}</span>
-            <span
-              className={`nav-group-chevron ${callActivityOpen ? 'is-open' : ''}`}
-              aria-label={callActivityOpen ? 'Collapse Call Activity' : 'Expand Call Activity'}
-            >
-              ⌄
-            </span>
-          </button>
-          {callActivityOpen && (
-            <div className="nav-group-children">
-              <Side list={CALL_ACTIVITY_CHILDREN} />
-            </div>
-          )}
-        </div>
+          <div className="sidenav-section">Platform</div>
+          <Side list={NAV_TABS_SECONDARY} />
 
-        <Side list={NAV_TABS_AFTER_CALLS} />
-
-        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
-            <DoorOpen size={16} strokeWidth={2} /> Log out
-          </button>
+          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
+              <DoorOpen size={16} strokeWidth={2} /> Log out
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -306,6 +271,7 @@ export default function Admin() {
         {tab === 'signups'                              && <Signups />}
         {tab === 'agents'                                && <AgentsList />}
         {tab === 'customers'                             && <Customers />}
+        {tab === 'customers-risk'                        && <CustomersAtRisk />}
         {tab === 'tools'                                 && <Tools />}
         {tab === 'playground'                            && <Playground />}
         {tab === 'mcp'                                    && <McpBrowser />}
@@ -414,8 +380,8 @@ function Usage() {
             <option value="30">Last 30 days</option>
             <option value="90">Last 90 days</option>
           </select>
-          <button className="btn-ghost text-sm" onClick={() => load(days)} disabled={loading}>
-            {loading ? '…' : '↻ Refresh'}
+          <button className="btn-refresh" onClick={() => load(days)} disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> {loading ? '…' : 'Refresh'}
           </button>
         </div>
       </div>
@@ -518,7 +484,7 @@ function Health() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">System health</h1>
-        <button className="btn-ghost text-sm" onClick={load}>↻ Refresh</button>
+        <button className="btn-refresh" onClick={load}><RefreshCw size={15} /> Refresh</button>
       </div>
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 

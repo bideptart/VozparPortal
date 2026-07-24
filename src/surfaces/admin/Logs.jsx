@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -61,7 +62,7 @@ export default function Logs() {
           subtitle so it's not lost. */}
       <div className="flex items-center justify-between">
         <p className="font-semibold text-base tracking-wide" style={{ color: 'var(--ink-2)' }}>Provisioning &amp; activity logs — live signup events and Twilio call activity.</p>
-        <button className="btn-ghost text-sm" onClick={load}>↻ Refresh</button>
+        <button className="btn-refresh" onClick={load}><RefreshCw size={15} /> Refresh</button>
       </div>
 
       {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}

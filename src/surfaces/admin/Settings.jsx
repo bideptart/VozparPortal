@@ -180,7 +180,7 @@ export default function Settings() {
           encrypted in the database and override <code>.env</code>. Clearing a field falls back to
           the env value.
         </p>
-        <button className="btn-ghost text-sm inline-flex items-center gap-1.5 shrink-0" onClick={load}>
+        <button className="btn-refresh btn-refresh-sm shrink-0" onClick={load}>
           <RefreshCw size={13} /> Refresh
         </button>
       </div>

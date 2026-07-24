@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 
@@ -187,8 +188,8 @@ export default function Tools() {
       </p>
 
       <div className="mt-4">
-        <button onClick={loadNumbers} disabled={loadingNumbers} className="btn-teal text-sm transition duration-200 ease-out hover:scale-105 active:scale-95">
-          {loadingNumbers ? 'Loading…' : '↻ Refresh'}
+        <button onClick={loadNumbers} disabled={loadingNumbers} className="btn-refresh">
+          <RefreshCw size={15} className={loadingNumbers ? 'animate-spin' : ''} /> {loadingNumbers ? 'Loading…' : 'Refresh'}
         </button>
       </div>
 

@@ -98,7 +98,7 @@ function AppRoutes() {
           </RequireAuth>
         }
       />
-      <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
+      <Route path="/admin" element={<Navigate to="/admin/signups" replace />} />
       <Route
         path="/admin/:tab"
         element={

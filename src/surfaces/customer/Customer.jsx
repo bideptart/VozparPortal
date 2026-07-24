@@ -153,73 +153,75 @@ export default function Customer() {
           </button>
         </div>
 
-        {/* Persistent "Welcome back" line — replaces the per-page Overview
-            heading so it stays visible across every dashboard tab. */}
-        <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">
-            Welcome back
-          </div>
-          <div className="mt-0.5 text-sm font-semibold text-[var(--foreground)] truncate">
-            {company}
-          </div>
-        </div>
-
-        <div className="sidenav-section mt-3">Manage</div>
-        {NAV_TABS_BEFORE_CALLS.map((t) => (
-          <Link
-            key={t.id}
-            to={`/dashboard/${t.id}`}
-            className={tab === t.id ? 'active' : ''}
-          >
-            <t.Icon size={16} strokeWidth={2} /> {t.label}
-          </Link>
-        ))}
-
-        <div className="nav-group">
-          <button
-            type="button"
-            onClick={() => setCallActivityOpen((v) => !v)}
-            className={`nav-group-toggle ${tab === CALL_ACTIVITY.id ? 'active' : ''}`}
-            aria-expanded={callActivityOpen}
-          >
-            <CALL_ACTIVITY.Icon size={16} strokeWidth={2} />
-            <span className="flex-1">{CALL_ACTIVITY.label}</span>
-            <span
-              className={`nav-group-chevron ${callActivityOpen ? 'is-open' : ''}`}
-              aria-label={callActivityOpen ? 'Collapse Call Activity' : 'Expand Call Activity'}
-            >
-              ⌄
-            </span>
-          </button>
-          {callActivityOpen && (
-            <div className="nav-group-children">
-              {CALL_ACTIVITY_CHILDREN.map((t) => (
-                <Link
-                  key={t.id}
-                  to={`/dashboard/${t.id}`}
-                  className={tab === t.id ? 'active' : ''}
-                >
-                  <t.Icon size={16} strokeWidth={2} /> {t.label}
-                </Link>
-              ))}
+        <div className="sidenav-scroll">
+          {/* Persistent "Welcome back" line — replaces the per-page Overview
+              heading so it stays visible across every dashboard tab. */}
+          <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold">
+              Welcome back
             </div>
-          )}
-        </div>
+            <div className="mt-0.5 text-sm font-semibold text-[var(--foreground)] truncate">
+              {company}
+            </div>
+          </div>
 
-        {NAV_TABS_AFTER_CALLS.map((t) => (
-          <Link
-            key={t.id}
-            to={`/dashboard/${t.id}`}
-            className={tab === t.id ? 'active' : ''}
-          >
-            <t.Icon size={16} strokeWidth={2} /> {t.label}
-          </Link>
-        ))}
+          <div className="sidenav-section mt-3">Manage</div>
+          {NAV_TABS_BEFORE_CALLS.map((t) => (
+            <Link
+              key={t.id}
+              to={`/dashboard/${t.id}`}
+              className={tab === t.id ? 'active' : ''}
+            >
+              <t.Icon size={16} strokeWidth={2} /> {t.label}
+            </Link>
+          ))}
 
-        <div className="mt-2 pt-2 border-t border-[var(--border)]">
-          <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
-            <DoorOpen size={16} strokeWidth={2} /> Log out
-          </button>
+          <div className="nav-group">
+            <button
+              type="button"
+              onClick={() => setCallActivityOpen((v) => !v)}
+              className={`nav-group-toggle ${tab === CALL_ACTIVITY.id ? 'active' : ''}`}
+              aria-expanded={callActivityOpen}
+            >
+              <CALL_ACTIVITY.Icon size={16} strokeWidth={2} />
+              <span className="flex-1">{CALL_ACTIVITY.label}</span>
+              <span
+                className={`nav-group-chevron ${callActivityOpen ? 'is-open' : ''}`}
+                aria-label={callActivityOpen ? 'Collapse Call Activity' : 'Expand Call Activity'}
+              >
+                ⌄
+              </span>
+            </button>
+            {callActivityOpen && (
+              <div className="nav-group-children">
+                {CALL_ACTIVITY_CHILDREN.map((t) => (
+                  <Link
+                    key={t.id}
+                    to={`/dashboard/${t.id}`}
+                    className={tab === t.id ? 'active' : ''}
+                  >
+                    <t.Icon size={16} strokeWidth={2} /> {t.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {NAV_TABS_AFTER_CALLS.map((t) => (
+            <Link
+              key={t.id}
+              to={`/dashboard/${t.id}`}
+              className={tab === t.id ? 'active' : ''}
+            >
+              <t.Icon size={16} strokeWidth={2} /> {t.label}
+            </Link>
+          ))}
+
+          <div className="mt-2 pt-2 border-t border-[var(--border)]">
+            <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
+              <DoorOpen size={16} strokeWidth={2} /> Log out
+            </button>
+          </div>
         </div>
       </aside>
 

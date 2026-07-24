@@ -56,35 +56,37 @@ export default function Reseller() {
           <span className="font-mono text-sm lowercase text-mute tracking-tight">kallus.io</span>
         </Link>
 
-        <div className="px-4 pt-3 pb-2 border-b border-slate-100">
-          <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">
-            Reseller
-          </div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-900 truncate">
-            {currentUser.company || currentUser.name}
-          </div>
-          {currentUser.resellerPortal && (
-            <div className="mt-0.5 text-[11px] font-mono text-lime-600 truncate">
-              {currentUser.resellerPortal}
+        <div className="sidenav-scroll">
+          <div className="px-4 pt-3 pb-2 border-b border-slate-100">
+            <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">
+              Reseller
             </div>
-          )}
-        </div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-900 truncate">
+              {currentUser.company || currentUser.name}
+            </div>
+            {currentUser.resellerPortal && (
+              <div className="mt-0.5 text-[11px] font-mono text-lime-600 truncate">
+                {currentUser.resellerPortal}
+              </div>
+            )}
+          </div>
 
-        <div className="sidenav-section mt-3">Workspace</div>
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            to={`/reseller/${t.id}`}
-            className={tab === t.id ? 'active' : ''}
-          >
-            <t.Icon size={16} strokeWidth={2} /> {t.label}
-          </Link>
-        ))}
+          <div className="sidenav-section mt-3">Workspace</div>
+          {TABS.map((t) => (
+            <Link
+              key={t.id}
+              to={`/reseller/${t.id}`}
+              className={tab === t.id ? 'active' : ''}
+            >
+              <t.Icon size={16} strokeWidth={2} /> {t.label}
+            </Link>
+          ))}
 
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <button type="button" onClick={signoutUser} className="nav-group-toggle">
-            <LogOut size={16} strokeWidth={2} /> Log out
-          </button>
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={signoutUser} className="nav-group-toggle">
+              <LogOut size={16} strokeWidth={2} /> Log out
+            </button>
+          </div>
         </div>
       </aside>
 
