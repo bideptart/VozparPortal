@@ -39,12 +39,12 @@ export default function ChatLogRow({ session, open, onToggle }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-mute">{fmtTime(s.startTime)}</span>
-              <span className="pill bg-white text-[#32CD32] border border-black text-xs font-semibold">
+              <span className="pill bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold">
                 <MessagesSquare className="w-3.5 h-3.5 shrink-0" />
                 {s.agentName}
               </span>
               {s.hasTranscript && (
-                <span className="pill bg-[#3a5a0c] text-white text-xs font-semibold">Transcript available</span>
+                <span className="pill bg-[var(--primary)] text-white text-xs font-semibold">Transcript available</span>
               )}
             </div>
             <div className="mt-2 font-mono text-xs text-mute break-all">{s.sessionId}</div>

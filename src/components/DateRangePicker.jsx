@@ -90,10 +90,14 @@ const PRESETS = [
 ];
 
 // Active-chip accent — defaults to the brand's lime everywhere this component
-// is already used (Recordings, Calls); Reports passes accent="green" to match
-// its brand-green (#3a5a0c) accent instead.
+// is already used (Recordings, Calls); Reports can opt into a blue Vozpar
+// variant to match the newer dashboard surfaces.
 const ACCENTS = {
   lime: { active: 'bg-lime-100 border-lime-300 text-lime-800', hover: 'hover:bg-lime-100 hover:border-lime-300 hover:text-lime-700' },
+  blue: {
+    active: 'bg-[var(--primary)] border-[var(--primary)] text-white',
+    hover: 'hover:border-[rgba(4,107,210,0.35)] hover:text-[var(--primary)]',
+  },
   green: {
     active: 'bg-[#3a5a0c] border-[#3a5a0c] text-white',
     hover: 'hover:border-[rgba(77,124,15,0.35)] hover:text-[#3a5a0c]',

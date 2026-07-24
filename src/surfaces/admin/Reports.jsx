@@ -256,7 +256,7 @@ export default function Reports() {
                 from={dateFrom}
                 to={dateTo}
                 onChange={({ from, to }) => setRange({ from, to })}
-                accent="green"
+                accent="blue"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function Reports() {
                 {logsTab === 'call' ? 'calls' : 'chats'}
               </span>
               {filtersActive && (
-                <button onClick={clearFilters} className="text-lime-600 hover:underline">
+                <button onClick={clearFilters} className="text-[var(--primary)] hover:underline">
                   Clear filters
                 </button>
               )}
@@ -284,7 +284,7 @@ export default function Reports() {
               <div className="inline-flex rounded-full border border-slate-200 overflow-hidden">
                 <button
                   className={`px-5 py-2 text-sm font-semibold transition ${
-                    viewTab === 'recording' ? 'bg-[#3a5a0c] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'
+                    viewTab === 'recording' ? 'bg-[var(--primary)] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'
                   }`}
                   onClick={() => setViewTab('recording')}
                 >
@@ -292,7 +292,7 @@ export default function Reports() {
                 </button>
                 <button
                   className={`px-5 py-2 text-sm font-semibold transition ${
-                    viewTab === 'transcript' ? 'bg-[#3a5a0c] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'
+                    viewTab === 'transcript' ? 'bg-[var(--primary)] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'
                   }`}
                   onClick={() => setViewTab('transcript')}
                 >
@@ -359,9 +359,9 @@ export default function Reports() {
                         <span className="text-mute">{fmtTime(r.startTime)}</span>
                         <span className={`pill text-xs ${fmtDirection(r.direction) === 'Inbound' ? 'bg-blue-50 text-blue-700' : fmtDirection(r.direction) === 'Outbound' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700'}`}>{fmtDirection(r.direction)}</span>
                         {r.hasTranscript ? (
-                          <span className="pill bg-[#3a5a0c] text-white text-xs">Transcript available</span>
+                          <span className="pill bg-[var(--primary)] text-white text-xs">Transcript available</span>
                         ) : (
-                          <span className="pill bg-[#98FB98] text-black text-xs">No transcript</span>
+                          <span className="pill bg-blue-50 text-blue-700 text-xs">No transcript</span>
                         )}
                         {viewTab === 'recording' && (
                           r.audioUrl ? (
@@ -549,7 +549,9 @@ export default function Reports() {
           <div className="form-card !p-3 space-y-1">
             <button
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition ${
-                logsTab === 'call' ? 'bg-[rgba(77,124,15,0.08)] text-[#3a5a0c] font-bold' : 'text-slate-600 font-medium hover:bg-slate-50'
+                logsTab === 'call'
+                  ? 'bg-[linear-gradient(135deg,rgba(4,107,210,0.22),rgba(4,107,210,0.10))] text-[var(--primary)] border border-[rgba(4,107,210,0.24)] font-bold'
+                  : 'text-slate-600 font-medium hover:bg-slate-50'
               }`}
               onClick={() => setLogsTab('call')}
             >
@@ -558,7 +560,9 @@ export default function Reports() {
             </button>
             <button
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition ${
-                logsTab === 'chat' ? 'bg-[rgba(77,124,15,0.08)] text-[#3a5a0c] font-bold' : 'text-slate-600 font-medium hover:bg-slate-50'
+                logsTab === 'chat'
+                  ? 'bg-[linear-gradient(135deg,rgba(4,107,210,0.22),rgba(4,107,210,0.10))] text-[var(--primary)] border border-[rgba(4,107,210,0.24)] font-bold'
+                  : 'text-slate-600 font-medium hover:bg-slate-50'
               }`}
               onClick={() => setLogsTab('chat')}
             >
