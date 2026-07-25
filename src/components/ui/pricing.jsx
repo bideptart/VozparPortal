@@ -97,7 +97,7 @@ function formatSavings(plan) {
   return plan.monthly * 12 - plan.yearly;
 }
 
-export default function PricingSection() {
+export default function PricingSection({ onSelectPlan }) {
   const [cycle, setCycle] = useState('monthly');
 
   const highlightedStats = useMemo(() => {
@@ -289,6 +289,7 @@ export default function PricingSection() {
 
                   <button
                     type="button"
+                    onClick={() => onSelectPlan?.(plan)}
                     className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                       plan.popular
                         ? 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]'
@@ -372,9 +373,12 @@ export default function PricingSection() {
               </div>
             </div>
 
-            <button type="button" className="btn-primary w-full">
+            <a
+              href="mailto:sales@vozper.com?subject=Enterprise%20plan%20inquiry"
+              className="btn-primary w-full text-center"
+            >
               Talk to Sales
-            </button>
+            </a>
           </CardContent>
         </Card>
       </section>
