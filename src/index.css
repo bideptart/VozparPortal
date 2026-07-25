@@ -100,6 +100,14 @@ p {
   .input-mono { font-family: ui-monospace, monospace; font-size: 13px; padding: 9px 12px; }
   .input-lg { padding: 14px 16px; font-size: 15px; }
   textarea.input { font-family: inherit; line-height: 1.5; }
+  /* Chromium (unlike Firefox/Safari) honors background/color on <option>,
+     so this at least stops the native <select> popup rendering white
+     against the rest of the dark theme — it won't restyle the popup's
+     chrome (border, corners) since that stays OS-native either way. */
+  select.input option {
+    background: var(--popover);
+    color: var(--foreground);
+  }
 
   /* === BUTTONS ==================================================== */
   .btn-primary {
