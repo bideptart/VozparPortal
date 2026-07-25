@@ -32,6 +32,7 @@ export default function Account() {
     currentUser,
     updateCurrentUser,
     changePassword,
+    deleteCurrentAccount,
     authError,
     setAuthError,
   } = useApp();
@@ -41,6 +42,7 @@ export default function Account() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const user = currentUser || {};
   const accountType = titleCase(user.userType || user.role || "user");
@@ -88,56 +90,88 @@ export default function Account() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm("Delete your account and release your number? This cannot be undone.");
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    try {
+      await deleteCurrentAccount();
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-up">
       <p className="text-sm text-[var(--body)]">Manage your profile details, contact information, and account security.</p>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.8fr]">
-        <section className="form-card overflow-hidden p-0">
-          <div className="h-36 bg-[radial-gradient(circle_at_top_left,rgba(37,117,252,0.8),transparent_38%),linear-gradient(135deg,#046BD2_0%,#0B1220_85%)]" />
-          <div className="px-6 pb-6">
-            <div className="-mt-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex items-end gap-4">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-[var(--surface)] bg-[linear-gradient(135deg,#046BD2,#0086F9)] text-2xl font-bold text-white shadow-lg">
-                  {initials}
-                </div>
-                <div className="pb-1">
-                  <h2 className="text-2xl font-semibold text-[var(--foreground)]">{user.name || user.company || "Account"}</h2>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="rounded-full border border-[rgba(4,107,210,0.25)] bg-[rgba(4,107,210,0.12)] px-2.5 py-1 font-medium text-[var(--primary)]">
-                      {accountType}
-                    </span>
-                    {user.plan?.label && (
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[var(--body)]">
-                        {user.plan.label} plan
+        <div className="space-y-6">
+          <section className="form-card overflow-hidden p-0">
+            <div className="h-36 bg-[radial-gradient(circle_at_top_left,rgba(37,117,252,0.8),transparent_38%),linear-gradient(135deg,#046BD2_0%,#0B1220_85%)]" />
+            <div className="px-6 pb-6">
+              <div className="-mt-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-end gap-4">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-[var(--surface)] bg-[linear-gradient(135deg,#046BD2,#0086F9)] text-2xl font-bold text-white shadow-lg">
+                    {initials}
+                  </div>
+                  <div className="pb-1">
+                    <h2 className="text-2xl font-semibold text-[var(--foreground)]">{user.name || user.company || "Account"}</h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full border border-[rgba(4,107,210,0.25)] bg-[rgba(4,107,210,0.12)] px-2.5 py-1 font-medium text-[var(--primary)]">
+                        {accountType}
                       </span>
-                    )}
+                      {user.plan?.label && (
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[var(--body)]">
+                          {user.plan.label} plan
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                <AccountDialog user={user} onSave={saveProfile} />
               </div>
 
-              <AccountDialog user={user} onSave={saveProfile} />
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {detailRows(user).map(({ icon: Icon, label, value }) => (
-                <div key={label} className="rounded-xl border border-white/10 bg-[var(--muted)]/70 px-4 py-3">
-                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--body)]/80">
-                    <Icon size={14} className="text-[var(--primary)]" />
-                    {label}
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {detailRows(user).map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="rounded-xl border border-white/10 bg-[var(--muted)]/70 px-4 py-3">
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--body)]/80">
+                      <Icon size={14} className="text-[var(--primary)]" />
+                      {label}
+                    </div>
+                    <div className="mt-2 text-sm text-[var(--foreground)]">{value}</div>
                   </div>
-                  <div className="mt-2 text-sm text-[var(--foreground)]">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            {(profileMsg || authError) && (
-              <div className={`mt-4 rounded-lg border px-3 py-2 text-xs ${authError ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-primary/25 bg-primary/10 text-primary"}`}>
-                {authError || profileMsg}
+                ))}
               </div>
-            )}
-          </div>
-        </section>
+
+              {(profileMsg || authError) && (
+                <div className={`mt-4 rounded-lg border px-3 py-2 text-xs ${authError ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-primary/25 bg-primary/10 text-primary"}`}>
+                  {authError || profileMsg}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="form-card">
+            <div className="rounded-2xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04))] p-5">
+              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-red-400">Danger Zone</div>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteBusy}
+                  className="inline-flex rounded-xl bg-[#ef2f2f] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(239,47,47,0.22)] transition hover:bg-[#ff3c3c] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deleteBusy ? "Deleting..." : "Delete account & release number"}
+                </button>
+              </div>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-[var(--body)]">
+                Cancels your subscription, deletes your agent, and releases your phone number. Cannot be undone.
+              </p>
+            </div>
+          </section>
+        </div>
 
         <aside className="space-y-6">
           <div className="form-card">
@@ -152,10 +186,6 @@ export default function Account() {
               <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">
                 <span>Company</span>
                 <span className="font-medium text-[var(--foreground)]">{user.company || "Not set"}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">
-                <span>Phone number</span>
-                <span className="font-medium text-[var(--foreground)]">{user.number?.value || user.phone || "Not set"}</span>
               </div>
               {user.plan?.label && (
                 <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">

@@ -127,64 +127,153 @@ export default function Reports() {
     <div className="reports-ref-shell animate-fade-up">
       <p className="reports-ref-intro">Call and chat history — recordings, transcripts, and AI summaries per record.</p>
 
-      <div className="reports-ref-top-grid">
-        <section className="reports-ref-main-card">
-          <div className="reports-ref-main-head">
-            <div className="reports-ref-title-row">
-              <h3>{logsTab === 'call' ? 'Call Logs' : 'Chat Logs'}</h3>
-              <span>{activeCount}</span>
-            </div>
-
-            <div className="reports-ref-toolbar">
-              <div className="reports-ref-search">
-                <Search size={14} />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={searchPlaceholder}
-                />
+      <div className="reports-ref-layout">
+        <div className="reports-ref-main-column">
+          <section className="reports-ref-main-card">
+            <div className="reports-ref-main-head">
+              <div className="reports-ref-title-row">
+                <h3>{logsTab === 'call' ? 'Call Logs' : 'Chat Logs'}</h3>
+                <span>{activeCount}</span>
               </div>
 
-              <button type="button" className="reports-ref-tool-btn">
-                <Download size={13} /> Export
-              </button>
-              <button type="button" className="reports-ref-tool-btn">
-                <ListRestart size={13} /> Refresh
-              </button>
+              <div className="reports-ref-toolbar">
+                <div className="reports-ref-search">
+                  <Search size={14} />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={searchPlaceholder}
+                  />
+                </div>
+
+                <button type="button" className="reports-ref-tool-btn">
+                  <Download size={13} /> Export
+                </button>
+                <button type="button" className="reports-ref-tool-btn">
+                  <ListRestart size={13} /> Refresh
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="reports-ref-chip-row">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={range === option.id ? 'is-active' : ''}
-                onClick={() => setRange(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+            <div className="reports-ref-chip-row">
+              {RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={range === option.id ? 'is-active' : ''}
+                  onClick={() => setRange(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-          <div className="reports-ref-date-grid">
-            <label>
-              <span>From date</span>
-              <input readOnly value={rangeDates.from ? formatShortDate(rangeDates.from) : ''} />
-            </label>
-            <label>
-              <span>To date</span>
-              <input readOnly value={rangeDates.to ? formatShortDate(rangeDates.to) : ''} />
-            </label>
-          </div>
+            <div className="reports-ref-date-grid">
+              <label>
+                <span>From date</span>
+                <input readOnly value={rangeDates.from ? formatShortDate(rangeDates.from) : ''} />
+              </label>
+              <label>
+                <span>To date</span>
+                <input readOnly value={rangeDates.to ? formatShortDate(rangeDates.to) : ''} />
+              </label>
+            </div>
 
-          <div className="reports-ref-filter-meta">
-            <span>
-              {activeCount} of {logsTab === 'call' ? CALL_LOGS.length : CHAT_LOGS.length} {logsTab === 'call' ? 'calls' : 'chats'}
-            </span>
-            <button type="button" onClick={clearFilters}>Clear filters</button>
-          </div>
-        </section>
+            <div className="reports-ref-filter-meta">
+              <span>
+                {activeCount} of {logsTab === 'call' ? CALL_LOGS.length : CHAT_LOGS.length} {logsTab === 'call' ? 'calls' : 'chats'}
+              </span>
+              <button type="button" onClick={clearFilters}>Clear filters</button>
+            </div>
+          </section>
+
+          {logsTab === 'call' ? (
+            <>
+              <div className="reports-ref-subtabs">
+                <button
+                  type="button"
+                  className={subTab === 'recording' ? 'is-active' : ''}
+                  onClick={() => setSubTab('recording')}
+                >
+                  Recording
+                </button>
+                <button
+                  type="button"
+                  className={subTab === 'transcript' ? 'is-active' : ''}
+                  onClick={() => setSubTab('transcript')}
+                >
+                  Transcript
+                </button>
+
+                <p>Listen back to any recorded call.</p>
+              </div>
+
+              {filteredCalls.length ? (
+                <div className="reports-ref-call-list">
+                  {filteredCalls.map((call) => (
+                    <article key={call.id} className="reports-ref-call-row">
+                      <div className="reports-ref-call-robot">
+                        <div className="reports-ref-robot-badge">
+                          <Bot size={16} />
+                        </div>
+                        <div>
+                          <strong>{call.number}</strong>
+                          <span>{formatDateTime(call.date)}</span>
+                        </div>
+                      </div>
+
+                      <div className="reports-ref-call-tags">
+                        <span className="reports-ref-agent-pill">
+                          <Bot size={11} />
+                          My Agent
+                        </span>
+                        <span className="reports-ref-availability-pill">
+                          {subTab === 'recording' ? 'Recording available' : 'Transcript available'}
+                        </span>
+                      </div>
+
+                      <div className="reports-ref-call-side">
+                        <span>{formatSeconds(call.duration)}</span>
+                        <button type="button">hangup</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="reports-ref-empty-card">No calls match the current filter.</div>
+              )}
+            </>
+          ) : (
+            <div className="reports-ref-chat-list">
+              {filteredChats.map((chat) => (
+                <article key={chat.id} className="reports-ref-chat-row">
+                  <div className="reports-ref-chat-left">
+                    <div className="reports-ref-robot-badge is-chat">
+                      <Bot size={16} />
+                    </div>
+                    <div>
+                      <strong>{formatDateTime(chat.date)}</strong>
+                      <span>{chat.session}</span>
+                    </div>
+                  </div>
+
+                  <div className="reports-ref-chat-tags">
+                    <span className="reports-ref-agent-pill">
+                      <Bot size={11} />
+                      {chat.agent}
+                    </span>
+                    <span className="reports-ref-availability-pill">Transcript available</span>
+                  </div>
+
+                  <div className="reports-ref-call-side">
+                    <span>{formatSeconds(chat.duration)}</span>
+                    <button type="button">{chat.outcome}</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
 
         <aside className="reports-ref-sidebar">
           <div className="reports-ref-switcher">
@@ -218,93 +307,6 @@ export default function Reports() {
           </div>
         </aside>
       </div>
-
-      {logsTab === 'call' ? (
-        <>
-          <div className="reports-ref-subtabs">
-            <button
-              type="button"
-              className={subTab === 'recording' ? 'is-active' : ''}
-              onClick={() => setSubTab('recording')}
-            >
-              Recording
-            </button>
-            <button
-              type="button"
-              className={subTab === 'transcript' ? 'is-active' : ''}
-              onClick={() => setSubTab('transcript')}
-            >
-              Transcript
-            </button>
-
-            <p>Listen back to any recorded call.</p>
-          </div>
-
-          {filteredCalls.length ? (
-            <div className="reports-ref-call-list">
-              {filteredCalls.map((call) => (
-                <article key={call.id} className="reports-ref-call-row">
-                  <div className="reports-ref-call-robot">
-                    <div className="reports-ref-robot-badge">
-                      <Bot size={16} />
-                    </div>
-                    <div>
-                      <strong>{call.number}</strong>
-                      <span>{formatDateTime(call.date)}</span>
-                    </div>
-                  </div>
-
-                  <div className="reports-ref-call-tags">
-                    <span className="reports-ref-agent-pill">
-                      <Bot size={11} />
-                      My Agent
-                    </span>
-                    <span className="reports-ref-availability-pill">
-                      {subTab === 'recording' ? 'Recording available' : 'Transcript available'}
-                    </span>
-                  </div>
-
-                  <div className="reports-ref-call-side">
-                    <span>{formatSeconds(call.duration)}</span>
-                    <button type="button">hangup</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="reports-ref-empty-card">No calls match the current filter.</div>
-          )}
-        </>
-      ) : (
-        <div className="reports-ref-chat-list">
-          {filteredChats.map((chat) => (
-            <article key={chat.id} className="reports-ref-chat-row">
-              <div className="reports-ref-chat-left">
-                <div className="reports-ref-robot-badge is-chat">
-                  <Bot size={16} />
-                </div>
-                <div>
-                  <strong>{formatDateTime(chat.date)}</strong>
-                  <span>{chat.session}</span>
-                </div>
-              </div>
-
-              <div className="reports-ref-chat-tags">
-                <span className="reports-ref-agent-pill">
-                  <Bot size={11} />
-                  {chat.agent}
-                </span>
-                <span className="reports-ref-availability-pill">Transcript available</span>
-              </div>
-
-              <div className="reports-ref-call-side">
-                <span>{formatSeconds(chat.duration)}</span>
-                <button type="button">{chat.outcome}</button>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

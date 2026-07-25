@@ -1853,11 +1853,17 @@ p {
     font-weight: 600;
     color: #d9e7f8;
   }
-  .reports-ref-top-grid {
+  .reports-ref-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 196px;
     gap: 16px;
     align-items: start;
+  }
+  .reports-ref-main-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
   }
   .reports-ref-main-card,
   .reports-ref-switcher,
@@ -2021,6 +2027,7 @@ p {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-width: 0;
   }
   .reports-ref-switcher {
     padding: 12px;
@@ -2187,7 +2194,7 @@ p {
     text-transform: lowercase;
   }
   @media (max-width: 1080px) {
-    .reports-ref-top-grid {
+    .reports-ref-layout {
       grid-template-columns: 1fr;
     }
     .reports-ref-sidebar {
