@@ -126,6 +126,39 @@ p {
   .btn-primary:active { background: var(--primary-pressed); transform: translateY(0); }
   .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
 
+  /* Primary CTA pill used across ~15 pages ("+ Add plan / number", "Save",
+     etc., admin + customer) — was referenced everywhere but never actually
+     defined, so every one of those buttons rendered as bare unstyled text
+     with no hover feedback. Same shape/motion as .btn-primary. */
+  .btn-teal {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary);
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 9999px;
+    font-weight: 600;
+    border: 1px solid rgba(4,107,210,0.28);
+    cursor: pointer;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.10) inset,
+      0 12px 28px -18px var(--glow-strong);
+    transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+  .btn-teal:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.12) inset,
+      0 16px 36px -18px var(--glow-strong);
+  }
+  .btn-teal:active:not(:disabled) { background: var(--primary-pressed); transform: translateY(0); }
+  .btn-teal:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
   .btn-ghost {
     background: var(--card);
     border: 1px solid var(--border);
