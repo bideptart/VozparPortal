@@ -218,7 +218,7 @@ export default function Customer() {
 
           <div className="mt-2 pt-2 border-t border-[var(--border)]">
             <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
-              <DoorOpen size={16} strokeWidth={2} /> Log out
+              Log out <DoorOpen size={16} strokeWidth={2} />
             </button>
           </div>
         </div>

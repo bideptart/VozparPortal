@@ -85,7 +85,7 @@ export default function Reseller() {
 
           <div className="mt-2 pt-2 border-t border-[var(--border)]">
             <button type="button" onClick={signoutUser} className="nav-group-toggle">
-              <LogOut size={16} strokeWidth={2} /> Log out
+              Log out <LogOut size={16} strokeWidth={2} />
             </button>
           </div>
         </div>
