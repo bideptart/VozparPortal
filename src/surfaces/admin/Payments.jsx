@@ -46,6 +46,32 @@ const monthlyFor = (did) => {
   return did?.planCycle === 'yearly' ? a / 12 : a;
 };
 
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
+// Shown only when the real customer list comes back empty (no DB in this
+// sandbox, or genuinely zero customers yet) — never overrides real data,
+// same rule the rest of the app follows for its DEMO_* fallbacks. Spread
+// across the last 14 days so the charts below have something to plot.
+const DEMO_USERS = [
+  { id: 'demo-1', company: 'Northwind Traders', name: 'Priya Shah', email: 'priya@northwind.example', createdAt: daysAgo(13), planActivated: daysAgo(13),
+    numbers: [{ id: 'd1', value: '+1 415 555 0142', isPrimary: true, planCycle: 'monthly', plan: { label: 'Growth', amount: 79 } }] },
+  { id: 'demo-2', company: 'Bluepeak Studio', name: 'Owen Clarke', email: 'owen@bluepeak.example', createdAt: daysAgo(11), planActivated: daysAgo(11),
+    numbers: [{ id: 'd2', value: '+1 212 555 0198', isPrimary: true, planCycle: 'monthly', plan: { label: 'Starter', amount: 29 } }] },
+  { id: 'demo-3', company: 'Larkspur Dental', name: 'Maria Gomez', email: 'maria@larkspur.example', createdAt: daysAgo(9), planActivated: daysAgo(9),
+    numbers: [
+      { id: 'd3a', value: '+1 646 555 0110', isPrimary: true, planCycle: 'yearly', plan: { label: 'Scale', amount: 1990 } },
+      { id: 'd3b', value: '+1 646 555 0111', isPrimary: false, planCycle: 'monthly', plan: { label: 'Starter', amount: 29 } },
+    ] },
+  { id: 'demo-4', company: 'Fernhill Logistics', name: 'Jack Turner', email: 'jack@fernhill.example', createdAt: daysAgo(7), planActivated: daysAgo(7),
+    numbers: [{ id: 'd4', value: '+1 312 555 0177', isPrimary: true, planCycle: 'monthly', plan: { label: 'Growth', amount: 79 } }] },
+  { id: 'demo-5', company: 'Amberlight Cafe', name: 'Sara Lund', email: 'sara@amberlight.example', createdAt: daysAgo(5), planActivated: daysAgo(5),
+    numbers: [{ id: 'd5', value: '+1 305 555 0163', isPrimary: true, planCycle: 'monthly', plan: { label: 'Starter', amount: 29 } }] },
+  { id: 'demo-6', company: 'Ridgeline Law Group', name: 'Dev Patel', email: 'dev@ridgeline.example', createdAt: daysAgo(3), planActivated: daysAgo(3),
+    numbers: [{ id: 'd6', value: '+1 720 555 0129', isPrimary: true, planCycle: 'monthly', plan: { label: 'Scale', amount: 199 } }] },
+  { id: 'demo-7', company: 'Solace Wellness', name: 'Emma Ross', email: 'emma@solace.example', createdAt: daysAgo(1), planActivated: daysAgo(1),
+    numbers: [{ id: 'd7', value: '+1 512 555 0184', isPrimary: true, planCycle: 'monthly', plan: { label: 'Growth', amount: 79 } }] },
+];
+
 function MetricCard({ title, value, icon, description, valueClassName }) {
   return (
     <Card className="flex-1 min-w-[220px]">
@@ -134,28 +160,35 @@ export default function Payments() {
 
   useEffect(() => { load(); }, []);
 
+  // Falls back to demo customers only when the real list comes back
+  // genuinely empty (no backend in this sandbox, or zero customers so far)
+  // — never overrides real data, and every derived number below flows
+  // through this single switch so cards/charts/table/activity all agree.
+  const usingDemo = users !== null && users.length === 0;
+  const effectiveUsers = users === null ? null : (users.length > 0 ? users : DEMO_USERS);
+
   // Locally re-derive MRR from the per-DID plan tiers so every number on
   // this page (cards, charts, table) agrees with each other — the legacy
   // /api/admin/stats `mrr` value only counted users.plan_amount once per
   // customer, not once per DID.
   const localMrr = useMemo(() => {
-    if (!users) return null;
+    if (!effectiveUsers) return null;
     let plans = 0, numbers = 0;
-    for (const u of users) {
+    for (const u of effectiveUsers) {
       const dids = didsFor(u);
       for (const d of dids) plans += monthlyFor(d);
       if (u.number) numbers += Number(u.numberPrice) || 0;
     }
     return { plans, numbers, total: plans + numbers };
-  }, [users]);
+  }, [effectiveUsers]);
 
   // Flat list of every DID activation across every customer, newest first —
   // the real-data equivalent of the "Latest Payments" feed: each DID's plan
   // purchase is the closest thing this app has to a discrete "payment" event.
   const activations = useMemo(() => {
-    if (!users) return [];
+    if (!effectiveUsers) return [];
     const rows = [];
-    for (const u of users) {
+    for (const u of effectiveUsers) {
       for (const d of didsFor(u)) {
         if (!d.plan) continue;
         rows.push({
@@ -170,14 +203,14 @@ export default function Payments() {
       }
     }
     return rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).slice(0, 10);
-  }, [users]);
+  }, [effectiveUsers]);
 
   // Daily new-MRR added (last 14 days) and cumulative MRR growth, both
   // bucketed from real signup/activation dates — no simulated data.
   const { dailyData, cumulativeData } = useMemo(() => {
-    if (!users) return { dailyData: [], cumulativeData: [] };
+    if (!effectiveUsers) return { dailyData: [], cumulativeData: [] };
     const events = [];
-    for (const u of users) {
+    for (const u of effectiveUsers) {
       for (const d of didsFor(u)) {
         const at = u.planActivated || u.createdAt;
         if (!at || !d.plan) continue;
@@ -210,17 +243,20 @@ export default function Payments() {
     });
 
     return { dailyData: days, cumulativeData: cumulative };
-  }, [users]);
+  }, [effectiveUsers]);
 
-  const activeCount = stats?.customers ?? users?.length ?? 0;
+  const activeCount = usingDemo ? DEMO_USERS.length : (stats?.customers ?? users?.length ?? 0);
   const avgPerCustomer = localMrr && activeCount > 0 ? localMrr.total / activeCount : 0;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-base font-semibold tracking-wide" style={{ color: 'var(--ink-2)' }}>
-          Recurring revenue across every plan a customer is on — one row per DID.
-        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-base font-semibold tracking-wide" style={{ color: 'var(--ink-2)' }}>
+            Recurring revenue across every plan a customer is on — one row per DID.
+          </p>
+          {usingDemo && <span className="overview-demo-pill">Demo data</span>}
+        </div>
         <button className="btn-refresh" onClick={load} title="Refresh data" disabled={loading}>
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
@@ -324,9 +360,8 @@ export default function Payments() {
               </tr>
             </thead>
             <tbody>
-              {users === null && <tr><td colSpan={5} className="text-center text-mute py-6">Loading…</td></tr>}
-              {users?.length === 0 && <tr><td colSpan={5} className="text-center text-mute py-6">No paying customers yet.</td></tr>}
-              {(users || []).flatMap((u) => {
+              {effectiveUsers === null && <tr><td colSpan={5} className="text-center text-mute py-6">Loading…</td></tr>}
+              {(effectiveUsers || []).flatMap((u) => {
                 const dids = didsFor(u);
                 if (dids.length === 0) {
                   return [(
