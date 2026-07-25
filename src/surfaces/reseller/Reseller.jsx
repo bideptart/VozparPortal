@@ -54,7 +54,7 @@ export default function Reseller() {
           className="h-16 flex items-center gap-2 px-4 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]"
           aria-label="kallus.io home"
         >
-          <Logo size={44} showWordmark={false} />
+          <Logo size={32} />
         </Link>
 
         <div className="sidenav-scroll">
