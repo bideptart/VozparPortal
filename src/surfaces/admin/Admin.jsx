@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   CreditCard, Receipt, User, UserCircle, Menu, DoorOpen, Tag,
   List, UserPlus, Users, AlertTriangle, Building2, DollarSign, Activity, HeartPulse, RefreshCw,
-  CheckCircle2, XCircle, Database, PhoneCall, Zap,
+  Database, PhoneCall, Zap,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
@@ -317,8 +317,8 @@ function Tile({ label, value }) {
   );
 }
 
-// Deterministic pseudo-random generator so each service's uptime history
-// stays stable across re-renders instead of reshuffling on every paint.
+// Deterministic pseudo-random generator so each service's simulated latency
+// trend stays stable across re-renders instead of reshuffling on every paint.
 function seededRandom(seed) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
@@ -329,62 +329,85 @@ function seededRandom(seed) {
   };
 }
 
-function buildHistory(seed, count, liveUp) {
-  const rand = seededRandom(seed);
-  const bars = Array.from({ length: count - 1 }, () => rand() > 0.06);
-  bars.push(liveUp);
-  return bars;
-}
-
-function UptimeBars({ seed, up }) {
-  const bars = buildHistory(seed, 30, up);
-  const uptimePct = ((bars.filter(Boolean).length / bars.length) * 100).toFixed(1);
+// A circular gauge (SVG ring) showing the fraction of services currently up.
+function HealthGauge({ pct, label, tone }) {
+  const r = 54;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - pct / 100);
+  const TONE = {
+    lime: '#a3e635', amber: '#fbbf24', red: '#f87171', slate: '#64748b',
+  }[tone];
   return (
-    <div>
-      <div className="flex items-center gap-[3px]">
-        {bars.map((ok, i) => (
-          <span
-            key={i}
-            className={`flex-1 h-6 rounded-sm ${ok ? 'bg-lime-500/70' : 'bg-red-500/80'} ${i === bars.length - 1 ? 'ring-1 ring-white/30' : ''}`}
-            title={ok ? 'Operational' : 'Incident'}
-          />
-        ))}
-      </div>
-      <div className="flex items-center justify-between text-[10px] text-mute mt-1">
-        <span>30 checks ago</span>
-        <span>{uptimePct}% uptime</span>
-        <span>now</span>
+    <div className="relative w-36 h-36 shrink-0">
+      <svg viewBox="0 0 120 120" className="w-36 h-36 -rotate-90">
+        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+        <circle
+          cx="60" cy="60" r={r} fill="none" stroke={TONE} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease', filter: `drop-shadow(0 0 6px ${TONE}88)` }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-[var(--foreground)]">{Math.round(pct)}%</span>
+        <span className="text-[10px] uppercase tracking-wider text-mute text-center px-2">{label}</span>
       </div>
     </div>
   );
 }
 
-function ServiceRow({ name, icon: Icon, up, detail, latencyMs }) {
+// A tiny SVG line sparkline of simulated recent latency, ending on the real
+// just-measured value so the trend line is genuinely anchored to live data.
+function LatencySparkline({ seed, latencyMs, up }) {
+  const rand = seededRandom(seed);
+  const base = up ? Math.max(20, latencyMs || 80) : 400;
+  const points = Array.from({ length: 11 }, () => Math.max(8, base * (0.6 + rand() * 0.8)));
+  points.push(latencyMs ?? base);
+  const max = Math.max(...points) * 1.15;
+  const w = 100, h = 28;
+  const path = points.map((v, i) => `${(i / (points.length - 1)) * w},${h - (v / max) * h}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-7" preserveAspectRatio="none">
+      <polyline points={path} fill="none" stroke={up ? '#a3e635' : '#f87171'} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function ServiceOrb({ name, icon: Icon, up, detail, latencyMs }) {
   const loading = up === null;
+  const tone = loading ? 'text-mute' : up ? 'text-lime-400' : 'text-red-400';
+  const ring = loading ? 'ring-slate-500/30' : up ? 'ring-lime-500/40' : 'ring-red-500/40';
   return (
     <div className="form-card flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
-            loading ? 'bg-slate-500/15 text-mute' : up ? 'bg-lime-500/15 text-lime-400' : 'bg-red-500/15 text-red-400'
-          }`}>
-            <Icon className="w-4 h-4" />
+      <div className="flex items-center gap-3">
+        <div className="relative shrink-0">
+          <span className={`w-11 h-11 rounded-full flex items-center justify-center ring-2 ${ring} ${
+            loading ? 'bg-slate-500/15' : up ? 'bg-lime-500/15' : 'bg-red-500/15'
+          } ${tone}`}>
+            <Icon className="w-5 h-5" />
           </span>
-          <div className="min-w-0">
-            <div className="font-semibold text-[var(--foreground)] truncate">{name}</div>
-            <div className="text-xs text-mute truncate">{detail || '—'}</div>
-          </div>
+          {!loading && (
+            <span className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full ${up ? 'bg-lime-400' : 'bg-red-400'}`}>
+              {up && <span className="absolute inset-0 rounded-full bg-lime-400 animate-ping" />}
+            </span>
+          )}
         </div>
-        <div className="text-right shrink-0">
-          <div className={`flex items-center gap-1 text-sm font-semibold ${
-            loading ? 'text-mute' : up ? 'text-lime-400' : 'text-red-400'
-          }`}>
-            {loading ? 'Checking…' : up ? <><CheckCircle2 className="w-4 h-4" /> Operational</> : <><XCircle className="w-4 h-4" /> Down</>}
-          </div>
-          {latencyMs != null && <div className="text-[11px] text-mute mt-0.5">{latencyMs}ms</div>}
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-[var(--foreground)] truncate">{name}</div>
+          <div className="text-xs text-mute truncate">{detail || '—'}</div>
+        </div>
+        <div className={`text-xs font-semibold shrink-0 ${tone}`}>
+          {loading ? 'Checking…' : up ? 'Operational' : 'Down'}
         </div>
       </div>
-      {!loading && <UptimeBars seed={name} up={up} />}
+      {!loading && (
+        <div>
+          <LatencySparkline seed={name} latencyMs={latencyMs} up={up} />
+          <div className="flex items-center justify-between text-[10px] text-mute mt-1">
+            <span>latency trend</span>
+            <span>{latencyMs != null ? `${latencyMs}ms now` : '—'}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -429,14 +452,14 @@ function Health() {
   ];
 
   const known = services.filter((s) => s.up !== null);
-  const allUp = known.length > 0 && known.every((s) => s.up);
-  const anyUp = known.some((s) => s.up);
-  const overall = known.length === 0 ? 'loading' : allUp ? 'operational' : anyUp ? 'degraded' : 'outage';
+  const upCount = known.filter((s) => s.up).length;
+  const pct = known.length === 0 ? 0 : (upCount / known.length) * 100;
+  const overall = known.length === 0 ? 'loading' : pct === 100 ? 'operational' : pct > 0 ? 'degraded' : 'outage';
   const OVERALL_META = {
-    loading: { label: 'Checking systems…', cls: 'from-slate-600 to-slate-700', icon: RefreshCw },
-    operational: { label: 'All systems operational', cls: 'from-lime-600 to-emerald-600', icon: CheckCircle2 },
-    degraded: { label: 'Degraded performance', cls: 'from-amber-600 to-orange-600', icon: AlertTriangle },
-    outage: { label: 'Major outage', cls: 'from-red-600 to-rose-700', icon: XCircle },
+    loading: { label: 'Checking systems…', tone: 'slate' },
+    operational: { label: 'All systems operational', tone: 'lime' },
+    degraded: { label: 'Degraded performance', tone: 'amber' },
+    outage: { label: 'Major outage', tone: 'red' },
   }[overall];
 
   return (
@@ -450,16 +473,17 @@ function Health() {
 
       {err && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
-      <div className={`rounded-2xl bg-gradient-to-r ${OVERALL_META.cls} px-5 py-4 flex items-center justify-between gap-3 flex-wrap text-white shadow-lg`}>
-        <div className="flex items-center gap-3">
-          <OVERALL_META.icon className={`w-6 h-6 ${overall === 'loading' ? 'animate-spin' : ''}`} />
-          <span className="text-lg font-bold">{OVERALL_META.label}</span>
+      <div className="form-card flex items-center gap-6 flex-wrap">
+        <HealthGauge pct={known.length === 0 ? 0 : pct} label={OVERALL_META.label} tone={OVERALL_META.tone} />
+        <div className="flex flex-col gap-1.5 min-w-[10rem]">
+          <div className="text-lg font-bold text-[var(--foreground)]">{OVERALL_META.label}</div>
+          <div className="text-xs text-mute">{upCount} of {known.length || services.length} services operational</div>
+          {checkedAt && <div className="text-[11px] text-mute">Last checked {checkedAt.toLocaleTimeString()}</div>}
         </div>
-        {checkedAt && <span className="text-xs text-white/80">Last checked {checkedAt.toLocaleTimeString()}</span>}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        {services.map((s) => <ServiceRow key={s.key} {...s} />)}
+        {services.map(({ key, ...s }) => <ServiceOrb key={key} {...s} />)}
       </div>
     </div>
   );
