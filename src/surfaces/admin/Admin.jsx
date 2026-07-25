@@ -17,6 +17,7 @@ const Customers = lazy(() => import('./Customers.jsx'));
 const Resellers = lazy(() => import('./Resellers.jsx'));
 const Numbers = lazy(() => import('./Numbers.jsx'));
 const Payments = lazy(() => import('./Payments.jsx'));
+const BillingMinutes = lazy(() => import('./BillingMinutes.jsx'));
 const Bulk = lazy(() => import('./Bulk.jsx'));
 const Logs = lazy(() => import('./Logs.jsx'));
 const Plans = lazy(() => import('./Plans.jsx'));
@@ -270,7 +271,8 @@ export default function Admin() {
         {(tab === 'calls' || tab === 'logs')            && <Logs />}
         {tab === 'reports'                               && <Reports />}
         {tab === 'health'                                && <Health />}
-        {(tab === 'billing' || tab === 'payments')      && <Payments />}
+        {tab === 'payments'                              && <Payments />}
+        {tab === 'billing'                               && <BillingMinutes />}
         {tab === 'transactions'                          && <Transactions />}
         {tab === 'pricing'                               && <Pricing />}
         {tab === 'settings'                              && <Settings />}
