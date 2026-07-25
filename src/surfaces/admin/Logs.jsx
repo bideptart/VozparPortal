@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, UserPlus, Hash, PhoneIncoming, PhoneOutgoing, Search, Activity } from 'lucide-react';
+import { RefreshCw, UserPlus, Hash, PhoneIncoming, Search, Activity, Terminal } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -38,16 +38,16 @@ const DEMO_EVENTS = [
 ];
 
 const TYPE_META = {
-  signup: { label: 'Signups', icon: UserPlus, color: 'text-lime-400', bg: 'bg-lime-500/15' },
-  number: { label: 'Numbers', icon: Hash, color: 'text-sky-400', bg: 'bg-sky-500/15' },
-  call: { label: 'Calls', icon: PhoneIncoming, color: 'text-amber-400', bg: 'bg-amber-500/15' },
+  signup: { label: 'Signups', tag: 'SIGNUP', color: 'text-lime-400' },
+  number: { label: 'Numbers', tag: 'NUMBER', color: 'text-sky-400' },
+  call: { label: 'Calls', tag: 'CALL', color: 'text-amber-400' },
 };
 
-const CALL_STATUS_STYLE = {
-  completed: 'bg-lime-500/15 text-lime-400',
-  'no-answer': 'bg-amber-500/15 text-amber-400',
-  failed: 'bg-red-500/15 text-red-400',
-  busy: 'bg-red-500/15 text-red-400',
+const CALL_STATUS_COLOR = {
+  completed: 'text-lime-400',
+  'no-answer': 'text-amber-400',
+  failed: 'text-red-400',
+  busy: 'text-red-400',
 };
 
 function StatChip({ icon: Icon, label, value }) {
@@ -60,26 +60,20 @@ function StatChip({ icon: Icon, label, value }) {
   );
 }
 
-function EventRow({ e }) {
+// A single console line — [type-tag] timestamp message, with the call
+// status (if any) colored inline like a log-level word would be.
+function ConsoleLine({ e }) {
   const meta = TYPE_META[e.type] || TYPE_META.signup;
-  const Icon = e.type === 'call' && e.direction === 'outbound' ? PhoneOutgoing : meta.icon;
   return (
-    <div className="flex items-start gap-3 py-3 px-4 hover:bg-white/[0.03] transition">
-      <span className={`shrink-0 w-8 h-8 rounded-full ${meta.bg} ${meta.color} flex items-center justify-center mt-0.5`}>
-        <Icon className="w-4 h-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-[var(--foreground)] truncate">{e.title}</span>
-          {e.type === 'call' && (
-            <span className={`pill text-[9px] uppercase tracking-wider font-semibold ${CALL_STATUS_STYLE[e.status] || 'bg-slate-500/15 text-mute'}`}>
-              {e.status}
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-mute font-mono truncate">{e.detail}</div>
-      </div>
-      <span className="shrink-0 text-[11px] text-mute whitespace-nowrap" title={fmtTs(e.ts)}>{timeAgo(e.ts)}</span>
+    <div className="px-4 py-1.5 hover:bg-white/[0.03] whitespace-pre-wrap break-all">
+      <span className="text-mute">[{fmtTs(e.ts)}]</span>{' '}
+      <span className={`font-bold ${meta.color}`}>[{meta.tag}]</span>{' '}
+      {e.type === 'call' && (
+        <span className={`font-bold ${CALL_STATUS_COLOR[e.status] || 'text-mute'}`}>{e.status.toUpperCase()} </span>
+      )}
+      <span className="text-[var(--foreground)]">{e.title}</span>
+      <span className="text-mute"> — {e.detail}</span>
+      <span className="text-mute/70"> ({timeAgo(e.ts)})</span>
     </div>
   );
 }
@@ -220,14 +214,26 @@ export default function Logs() {
             </div>
           </div>
 
-          <div className="form-card !p-0 overflow-hidden">
-            {filtered.length === 0 ? (
-              <div className="text-center text-mute py-10">No events match this filter.</div>
-            ) : (
-              <div className="divide-y divide-[var(--border)]">
-                {filtered.map((e) => <EventRow key={e.id} e={e} />)}
+          <div className="rounded-xl border border-[var(--border)] bg-black/40 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border)] bg-black/30">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
+              <span className="w-2.5 h-2.5 rounded-full bg-lime-500/70" />
+              <span className="ml-2 text-[11px] text-mute font-mono flex items-center gap-1">
+                <Terminal className="w-3 h-3" /> activity.log
+              </span>
+              <span className="ml-auto text-[11px] text-mute font-mono">{filtered.length} lines</span>
+            </div>
+            <div className="max-h-[520px] overflow-y-auto font-mono text-xs py-2">
+              {filtered.length === 0 ? (
+                <div className="text-center text-mute py-10">No events match this filter.</div>
+              ) : (
+                filtered.map((e) => <ConsoleLine key={e.id} e={e} />)
+              )}
+              <div className="px-4 py-1.5 text-lime-400">
+                <span className="animate-pulse">▍</span>
               </div>
-            )}
+            </div>
           </div>
         </>
       )}
