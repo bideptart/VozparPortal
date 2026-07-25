@@ -18,6 +18,66 @@ const initials = (name) => (name || '?')
 
 const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
 
+// Groups the flat reseller list into top-level roots with their
+// sub-resellers nested beneath, keyed by matching portal slug.
+function groupByParent(list) {
+  const roots = list.filter((r) => !r.parent);
+  // A sub-reseller whose parent isn't in this list (e.g. parent filtered
+  // out elsewhere) is shown as its own root rather than dropped.
+  const orphans = list.filter((r) => r.parent && !roots.some((p) => p.resellerPortal === r.parent.resellerPortal));
+  return [...roots, ...orphans].map((root) => ({
+    root,
+    children: list.filter((r) => r.parent && r.parent.resellerPortal === root.resellerPortal),
+  }));
+}
+
+function ResellerRow({ r, onDrill, disabled, compact }) {
+  const isSub = r.userType === 'sub-reseller';
+  return (
+    <div className={`flex items-center gap-3 flex-wrap ${compact ? 'py-3 pr-4' : 'p-4'}`}>
+      <span className={`shrink-0 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white font-bold ${
+        compact ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm'
+      }`}>
+        {initials(r.company || r.name)}
+      </span>
+
+      <div className="min-w-[9rem] flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-[var(--foreground)]">{r.company || r.name}</span>
+          <span className={`pill text-[9px] uppercase tracking-wider font-semibold ${
+            isSub ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'
+          }`}>
+            {isSub ? 'sub-reseller' : 'reseller'}
+          </span>
+        </div>
+        <div className="text-xs text-mute truncate">{r.email} · @{r.username}</div>
+      </div>
+
+      <div className="flex items-center gap-x-4 gap-y-1 text-xs text-mute flex-wrap">
+        <span className="flex items-center gap-1 font-mono text-lime-400"><Building2 className="w-3 h-3" /> {r.resellerPortal || '—'}</span>
+        <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {r.phone || '—'}</span>
+        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {r.kycLocation || '—'}</span>
+        <span>Joined {fmtDate(r.createdAt)}</span>
+      </div>
+
+      <div className="shrink-0">
+        {r.customerCount > 0 ? (
+          <button
+            onClick={() => onDrill(r)}
+            disabled={disabled}
+            className="pill bg-lime-500/10 text-lime-400 hover:bg-lime-500/20 transition cursor-pointer inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={disabled ? 'Demo data — nothing to drill into' : 'Click to see all customers under this reseller'}
+          >
+            <UsersIcon className="w-3 h-3" /> {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'} →
+          </button>
+        ) : (
+          <span className="pill bg-slate-500/15 text-mute">0 customers</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const emptyForm = () => ({
   name: '', company: '', email: '', phone: '',
   username: '', password: '',
@@ -222,9 +282,9 @@ export default function Resellers() {
         </form>
       )}
 
-      {/* === Reseller list — card grid instead of a wide table, so the
-          parent/customer-count/KYC fields don't have to squeeze into
-          narrow columns. ============================================== */}
+      {/* === Reseller list — network tree grouped by parent/sub-reseller,
+          instead of a flat table or card grid, so the hierarchy is visible
+          at a glance. ======================================================= */}
       {effectiveList === null && <div className="form-card text-center text-mute py-10">Loading…</div>}
       {effectiveList?.length === 0 && (
         <div className="form-card text-center text-mute py-10">
@@ -232,59 +292,27 @@ export default function Resellers() {
         </div>
       )}
       {effectiveList && effectiveList.length > 0 && (
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {effectiveList.map((r) => {
-            const isSub = r.userType === 'sub-reseller';
-            return (
-              <div key={r.id} className="form-card flex flex-col gap-3 transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-sm font-bold">
-                      {initials(r.company || r.name)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-[var(--foreground)] truncate">{r.company || r.name}</div>
-                      <div className="text-xs text-mute truncate">{r.email} · @{r.username}</div>
+        <div className="flex flex-col gap-4">
+          {groupByParent(effectiveList).map(({ root, children }) => (
+            <div key={root.id} className="form-card !p-0 overflow-hidden">
+              <ResellerRow r={root} onDrill={setDrilledReseller} disabled={isDemoRow(root.id)} />
+              {children.length > 0 && (
+                <div className="border-t border-[var(--border)] bg-black/10">
+                  {children.map((c, i) => (
+                    <div key={c.id} className="relative pl-10">
+                      <span
+                        className="absolute left-5 top-0 w-px bg-[var(--border)]"
+                        style={{ bottom: i === children.length - 1 ? '50%' : 0 }}
+                        aria-hidden="true"
+                      />
+                      <span className="absolute left-5 top-1/2 w-4 h-px bg-[var(--border)]" aria-hidden="true" />
+                      <ResellerRow r={c} onDrill={setDrilledReseller} disabled={isDemoRow(c.id)} compact />
                     </div>
-                  </div>
-                  <span className={`pill text-[10px] uppercase tracking-wider font-semibold shrink-0 ${
-                    isSub ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'
-                  }`}>
-                    {isSub ? 'sub-reseller' : 'reseller'}
-                  </span>
+                  ))}
                 </div>
-
-                {r.parent && (
-                  <div className="text-xs text-mute">
-                    Under <span className="text-[var(--foreground)] font-medium">{r.parent.company || r.parent.name}</span>
-                    {' '}<span className="font-mono text-lime-400">{r.parent.resellerPortal || r.parent.email}</span>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                  <span className="flex items-center gap-1 font-mono text-lime-400"><Building2 className="w-3 h-3" /> {r.resellerPortal || '—'}</span>
-                  <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {r.phone || '—'}</span>
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {r.kycLocation || '—'}</span>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]">
-                  {r.customerCount > 0 ? (
-                    <button
-                      onClick={() => setDrilledReseller(r)}
-                      disabled={isDemoRow(r.id)}
-                      className="pill bg-lime-500/10 text-lime-400 hover:bg-lime-500/20 transition cursor-pointer inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={isDemoRow(r.id) ? 'Demo data — nothing to drill into' : 'Click to see all customers under this reseller'}
-                    >
-                      <UsersIcon className="w-3 h-3" /> {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'} →
-                    </button>
-                  ) : (
-                    <span className="pill bg-slate-500/15 text-mute">0 customers</span>
-                  )}
-                  <span className="text-xs text-mute">Joined {fmtDate(r.createdAt)}</span>
-                </div>
-              </div>
-            );
-          })}
+              )}
+            </div>
+          ))}
         </div>
       )}
 
