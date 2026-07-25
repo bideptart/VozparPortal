@@ -106,16 +106,46 @@ function ChartStat({ label, value, valueClassName }) {
   );
 }
 
+const DURATION_OPTIONS = [
+  { days: 7, label: '7d' },
+  { days: 14, label: '14d' },
+  { days: 30, label: '30d' },
+  { days: 90, label: '90d' },
+];
+
+function DurationToggle({ value, onChange }) {
+  return (
+    <div className="inline-flex items-center p-0.5 gap-0.5 rounded-lg border border-[var(--border)] bg-white/[0.03]">
+      {DURATION_OPTIONS.map((opt) => (
+        <button
+          key={opt.days}
+          type="button"
+          onClick={() => onChange(opt.days)}
+          className={`appearance-none px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+            value === opt.days ? 'text-white' : 'text-[var(--body)] hover:text-[var(--foreground)]'
+          }`}
+          style={{ backgroundColor: value === opt.days ? 'var(--primary)' : 'transparent' }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Discrete per-day totals — a bar per day is the honest representation.
 // A smoothed line here would visually imply a continuous trend between
 // days that mostly have $0, which is misleading.
-function NewMrrChart({ data }) {
+function NewMrrChart({ data, days, onDaysChange }) {
   const total = useMemo(() => data.reduce((a, d) => a + d.amount, 0), [data]);
 
   return (
     <Card className="flex-1 min-w-[300px]">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <CardTitle className="text-base font-semibold">New MRR — last 14 days</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3 flex-wrap">
+        <div>
+          <CardTitle className="text-base font-semibold">New MRR — last {days} days</CardTitle>
+          <div className="mt-2"><DurationToggle value={days} onChange={onDaysChange} /></div>
+        </div>
         <ChartStat label="Total added" value={fmtCurrency(total)} valueClassName="text-[var(--primary)]" />
       </CardHeader>
       <CardContent>
@@ -213,6 +243,7 @@ export default function Payments() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [lastLoaded, setLastLoaded] = useState(null);
+  const [newMrrDays, setNewMrrDays] = useState(14);
 
   const load = async () => {
     setErr(''); setLoading(true);
@@ -282,8 +313,9 @@ export default function Payments() {
     return rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).slice(0, 10);
   }, [effectiveUsers]);
 
-  // Daily new-MRR added (last 14 days) and cumulative MRR growth, both
-  // bucketed from real signup/activation dates — no simulated data.
+  // Daily new-MRR added (duration picked via the chart's toggle) and
+  // cumulative MRR growth (always full history), both bucketed from real
+  // signup/activation dates — no simulated data.
   const { dailyData, cumulativeData } = useMemo(() => {
     if (!effectiveUsers) return { dailyData: [], cumulativeData: [] };
     const events = [];
@@ -299,10 +331,10 @@ export default function Payments() {
     const ymd = (d) => d.toISOString().slice(0, 10);
     const dayLabel = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    // Last 14 calendar days, zero-filled.
+    // Last `newMrrDays` calendar days, zero-filled.
     const days = [];
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    for (let i = 13; i >= 0; i--) {
+    for (let i = newMrrDays - 1; i >= 0; i--) {
       const d = new Date(today); d.setDate(d.getDate() - i);
       days.push({ key: ymd(d), label: dayLabel(d), amount: 0 });
     }
@@ -320,7 +352,7 @@ export default function Payments() {
     });
 
     return { dailyData: days, cumulativeData: cumulative };
-  }, [effectiveUsers]);
+  }, [effectiveUsers, newMrrDays]);
 
   const activeCount = usingDemo ? DEMO_USERS.length : (stats?.customers ?? users?.length ?? 0);
   const avgPerCustomer = localMrr && activeCount > 0 ? localMrr.total / activeCount : 0;
@@ -373,7 +405,7 @@ export default function Payments() {
 
       {/* Charts */}
       <div className="flex flex-wrap gap-4">
-        <NewMrrChart data={dailyData} />
+        <NewMrrChart data={dailyData} days={newMrrDays} onDaysChange={setNewMrrDays} />
         <CumulativeMrrChart data={cumulativeData} />
       </div>
 
