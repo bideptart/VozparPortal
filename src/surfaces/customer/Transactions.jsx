@@ -6,6 +6,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
+import DatePickerField from '../../components/ui/date-picker.jsx';
 
 const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
 
@@ -268,26 +269,22 @@ export default function Transactions() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-1.5">From date</label>
-            <input
-              type="date"
-              className="input"
+            <DatePickerField
               value={dates.from}
-              onChange={(e) => {
+              onChange={(value) => {
                 setPreset('custom');
-                setDates((prev) => ({ ...prev, from: e.target.value }));
+                setDates((prev) => ({ ...prev, from: value }));
               }}
             />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-1.5">To date</label>
-            <input
-              type="date"
-              className="input"
+            <DatePickerField
               value={dates.to}
-              onChange={(e) => {
+              onChange={(value) => {
                 setPreset('custom');
-                setDates((prev) => ({ ...prev, to: e.target.value }));
+                setDates((prev) => ({ ...prev, to: value }));
               }}
             />
           </div>
