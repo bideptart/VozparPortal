@@ -79,7 +79,7 @@ export default function Resellers() {
         </div>
         <button
           onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
-          className={`px-4 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT}`}
+          className={`px-4 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT} transition duration-200 ease-out hover:scale-105 hover:shadow-lg hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:pointer-events-none`}
         >
           {showForm ? '× Cancel' : '+ Register new reseller'}
         </button>
@@ -185,7 +185,7 @@ export default function Resellers() {
             <button
               type="submit"
               disabled={busy}
-              className={`px-5 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT}`}
+              className={`px-5 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT} transition duration-200 ease-out hover:scale-105 hover:shadow-lg hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:pointer-events-none`}
             >
               {busy ? 'Registering…' : 'Register reseller'}
             </button>
