@@ -242,45 +242,71 @@ export default function ChatAgentDetail() {
           <div className="lg:sticky lg:top-20">
             <div className="text-xs font-mono uppercase tracking-wide font-semibold" style={{ color: 'var(--primary)' }}>Live preview</div>
             <div
-              className="mt-3 rounded-2xl border shadow-lg overflow-hidden transition-all duration-200 ease-out"
-              style={{ borderColor: 'var(--line)', background: cfg.theme === 'dark' ? '#1a2030' : '#fff', width: '100%' }}
+              className="mt-3 overflow-hidden transition-all duration-200 ease-out"
+              style={{
+                width: '100%',
+                borderRadius: 18,
+                border: '1px solid #c7daf3',
+                background: '#f7fbff',
+                boxShadow: '0 14px 34px rgba(4, 107, 210, 0.12)',
+              }}
             >
-              <div className={cfg.size === 'large' ? 'px-5 py-4' : 'px-4 py-3'} style={{ background: cfg.accentColor }}>
-                <div className={`text-white font-semibold ${cfg.size === 'large' ? 'text-base' : 'text-sm'}`}>{cfg.widgetTitle || 'Chat with us'}</div>
-                <div className="text-white/80 text-xs flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#8fd0ff' }} /> Online
+              <div
+                className={cfg.size === 'large' ? 'px-5 py-4' : 'px-4 py-3'}
+                style={{ background: cfg.accentColor }}
+              >
+                <div className={`text-white font-semibold ${cfg.size === 'large' ? 'text-[15px]' : 'text-sm'}`}>{cfg.widgetTitle || 'Chat with us'}</div>
+                <div className="text-white/90 text-xs flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#cfeaff' }} /> Online
                 </div>
               </div>
-              <div className={`space-y-2 ${cfg.size === 'large' ? 'p-4 min-h-[220px]' : 'p-3 min-h-[160px]'}`} style={{ background: cfg.theme === 'dark' ? '#232a3d' : '#f6f8f1' }}>
+              <div
+                className={`space-y-2 ${cfg.size === 'large' ? 'p-4 min-h-[220px]' : 'p-3 min-h-[178px]'}`}
+                style={{ background: '#eef5fd' }}
+              >
                 <div
-                  className={`max-w-[85%] rounded-xl rounded-tl-sm ${cfg.size === 'large' ? 'px-4 py-2.5 text-[15px]' : 'px-3 py-2 text-sm'}`}
-                  style={{ background: cfg.theme === 'dark' ? '#333d57' : '#fff', color: cfg.theme === 'dark' ? '#e5e9f5' : 'var(--ink)' }}
+                  className={`max-w-[88%] rounded-[18px] ${cfg.size === 'large' ? 'px-4 py-2.5 text-[15px]' : 'px-3.5 py-2 text-sm'}`}
+                  style={{
+                    background: '#f8fbff',
+                    color: '#455468',
+                    border: '1px solid #cfdef2',
+                    boxShadow: '0 1px 0 rgba(255,255,255,0.8) inset',
+                  }}
                 >
                   {cfg.welcome || 'Hi! How can I help you today?'}
                 </div>
                 <div
-                  className={`max-w-[85%] ml-auto rounded-xl rounded-tr-sm text-white ${cfg.size === 'large' ? 'px-4 py-2.5 text-[15px]' : 'px-3 py-2 text-sm'}`}
+                  className={`max-w-[88%] ml-auto rounded-[18px] text-white font-semibold ${cfg.size === 'large' ? 'px-4 py-2.5 text-[15px]' : 'px-3.5 py-2 text-sm'}`}
                   style={{ background: cfg.accentColor }}
                 >
                   Hi, I have a question
                 </div>
               </div>
-              <div className={`border-t flex items-center gap-2 ${cfg.size === 'large' ? 'p-3' : 'p-2.5'}`} style={{ borderColor: 'var(--line-2)', background: cfg.theme === 'dark' ? '#1a2030' : '#fff' }}>
-                <div className={`flex-1 rounded-full ${cfg.size === 'large' ? 'px-4 py-2.5 text-sm' : 'px-3 py-2 text-xs'}`} style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
-                  Type a message…
+              <div
+                className={`border-t flex items-center gap-2 ${cfg.size === 'large' ? 'p-3' : 'p-2.5'}`}
+                style={{ borderColor: '#c7daf3', background: '#f7fbff' }}
+              >
+                <div
+                  className={`flex-1 rounded-full ${cfg.size === 'large' ? 'px-4 py-2.5 text-sm' : 'px-4 py-2 text-xs'}`}
+                  style={{ background: '#e8f1fb', color: '#7f93ad' }}
+                >
+                  Type a message...
                 </div>
-                <div className={`rounded-full flex items-center justify-center flex-shrink-0 ${cfg.size === 'large' ? 'w-9 h-9' : 'w-8 h-8'}`} style={{ background: cfg.accentColor }}>
+                <div
+                  className={`rounded-full flex items-center justify-center flex-shrink-0 ${cfg.size === 'large' ? 'w-9 h-9' : 'w-8 h-8'}`}
+                  style={{ background: cfg.accentColor }}
+                >
                   <Send size={cfg.size === 'large' ? 15 : 13} color="#fff" />
                 </div>
               </div>
               {cfg.showBranding && (
-                <div className="text-center text-[10px] py-1.5" style={{ color: 'var(--ink-3)', background: cfg.theme === 'dark' ? '#1a2030' : '#fff' }}>
-                  Powered by kallus.io
+                <div className="text-center text-[10px] py-1.5 font-medium" style={{ color: '#7f93ad', background: '#f7fbff' }}>
+                  Powered by Vozpar
                 </div>
               )}
             </div>
             <p className="mt-2 text-xs text-mute">
-              {cfg.mode === 'popup' ? 'Popup' : 'Inline'} — a bubble in the {cfg.position.replace('-', ' ')} corner ({cfg.size}).
+              {cfg.mode === 'popup' ? 'Popup' : 'Inline'} — a bubble in the {cfg.position.replace('-', ' ')} corner.
             </p>
           </div>
         </div>
