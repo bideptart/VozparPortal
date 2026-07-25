@@ -317,18 +317,6 @@ function Tile({ label, value }) {
   );
 }
 
-// Deterministic pseudo-random generator so each service's simulated latency
-// trend stays stable across re-renders instead of reshuffling on every paint.
-function seededRandom(seed) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
-  return () => {
-    h = Math.imul(h ^ (h >>> 15), 1 | h);
-    h ^= h + Math.imul(h ^ (h >>> 7), 61 | h);
-    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 // A circular gauge (SVG ring) showing the fraction of services currently up.
 function HealthGauge({ pct, label, tone }) {
   const r = 54;
@@ -355,38 +343,32 @@ function HealthGauge({ pct, label, tone }) {
   );
 }
 
-// A tiny SVG line sparkline of simulated recent latency, ending on the real
-// just-measured value so the trend line is genuinely anchored to live data.
-function LatencySparkline({ seed, latencyMs, up }) {
-  const rand = seededRandom(seed);
-  const base = up ? Math.max(20, latencyMs || 80) : 400;
-  const points = Array.from({ length: 11 }, () => Math.max(8, base * (0.6 + rand() * 0.8)));
-  points.push(latencyMs ?? base);
-  const max = Math.max(...points) * 1.15;
-  const w = 100, h = 28;
-  const coords = points.map((v, i) => [(i / (points.length - 1)) * w, h - (v / max) * h]);
-  const linePath = coords.map((p) => p.join(',')).join(' ');
-  const areaPath = `0,${h} ${linePath} ${w},${h}`;
-  const [lastX, lastY] = coords[coords.length - 1];
-  const color = up ? '#a3e635' : '#f87171';
-  const gradId = `spark-grad-${seed.replace(/\s+/g, '-')}`;
+// Classic signal-strength bars (like a phone's signal meter) standing in
+// for the latency graph — 5 bars of increasing height, lit up based on how
+// fast the real measured response was. Each bar animates in with a stagger.
+const SIGNAL_THRESHOLDS = [50, 100, 200, 350]; // ms cutoffs: <=50 -> 5 bars, <=100 -> 4, ...
+
+function barsForLatency(latencyMs, up) {
+  if (!up) return 0;
+  if (latencyMs == null) return 5;
+  const idx = SIGNAL_THRESHOLDS.findIndex((t) => latencyMs <= t);
+  return idx === -1 ? 1 : 5 - idx;
+}
+
+function SignalBars({ latencyMs, up }) {
+  const lit = barsForLatency(latencyMs, up);
+  const color = !up ? 'bg-red-400' : lit >= 4 ? 'bg-lime-400' : lit >= 2 ? 'bg-amber-400' : 'bg-red-400';
+  const heights = ['h-2', 'h-3', 'h-4', 'h-5', 'h-6'];
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-7 overflow-visible" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={areaPath} fill={`url(#${gradId})`} className="sparkline-area" />
-      <polyline
-        points={linePath} fill="none" stroke={color} strokeWidth="1.5"
-        strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
-        pathLength="100" className="sparkline-line"
-      />
-      <circle cx={lastX} cy={lastY} r="4" fill={color} opacity="0.35" className="animate-ping" style={{ transformOrigin: `${lastX}px ${lastY}px` }} />
-      <circle cx={lastX} cy={lastY} r="1.8" fill={color} />
-    </svg>
+    <div className="flex items-end gap-1">
+      {heights.map((h, i) => (
+        <span
+          key={i}
+          className={`signal-bar w-1.5 ${h} rounded-sm origin-bottom transition-colors duration-500 ${i < lit ? color : 'bg-white/10'}`}
+          style={{ animationDelay: `${i * 90}ms` }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -418,12 +400,9 @@ function ServiceOrb({ name, icon: Icon, up, detail, latencyMs }) {
         </div>
       </div>
       {!loading && (
-        <div>
-          <LatencySparkline seed={name} latencyMs={latencyMs} up={up} />
-          <div className="flex items-center justify-between text-[10px] text-mute mt-1">
-            <span>latency trend</span>
-            <span>{latencyMs != null ? `${latencyMs}ms now` : '—'}</span>
-          </div>
+        <div className="flex items-center justify-between">
+          <SignalBars latencyMs={latencyMs} up={up} />
+          <span className="text-[10px] text-mute">{latencyMs != null ? `${latencyMs}ms` : up ? 'no round-trip' : 'timeout'}</span>
         </div>
       )}
     </div>

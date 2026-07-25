@@ -876,22 +876,12 @@ p {
     font-weight: 600;
     white-space: nowrap;
   }
-  @keyframes sparkline-draw {
-    from { stroke-dashoffset: 100; }
-    to   { stroke-dashoffset: 0; }
+  @keyframes signal-bar-grow {
+    from { transform: scaleY(0); opacity: 0; }
+    to   { transform: scaleY(1); opacity: 1; }
   }
-  .sparkline-line {
-    stroke-dasharray: 100;
-    stroke-dashoffset: 100;
-    animation: sparkline-draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  }
-  @keyframes sparkline-fade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  .sparkline-area {
-    opacity: 0;
-    animation: sparkline-fade 0.8s ease-out 0.6s forwards;
+  .signal-bar {
+    animation: signal-bar-grow 0.4s ease-out backwards;
   }
   .overview-banner,
   .overview-card {
