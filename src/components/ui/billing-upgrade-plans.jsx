@@ -1,15 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import confetti from "canvas-confetti";
+import { useMemo, useState } from "react";
 import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 import { Check, Sparkles, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { buttonVariants } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +56,6 @@ export default function BillingUpgradePlans({
 }) {
   const [isMonthly, setIsMonthly] = useState(true);
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const switchRef = useRef(null);
 
   const normalizedPlans = useMemo(
     () => plans.map((plan) => normalizePlan(plan, hasActivePlans)),
@@ -68,24 +64,6 @@ export default function BillingUpgradePlans({
 
   const handleToggle = (checked) => {
     setIsMonthly(!checked);
-
-    if (checked && switchRef.current && typeof window !== "undefined") {
-      const rect = switchRef.current.getBoundingClientRect();
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: {
-          x: (rect.left + rect.width / 2) / window.innerWidth,
-          y: (rect.top + rect.height / 2) / window.innerHeight,
-        },
-        colors: ["#046BD2", "#0086F9", "#22D3EE", "#FFFFFF"],
-        ticks: 200,
-        gravity: 1.2,
-        decay: 0.94,
-        startVelocity: 30,
-        shapes: ["circle"],
-      });
-    }
   };
 
   return (
@@ -106,14 +84,24 @@ export default function BillingUpgradePlans({
 
       <div className="flex justify-center">
         <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5">
-          <Label className="cursor-pointer">
-            <Switch
-              ref={switchRef}
-              checked={!isMonthly}
-              onCheckedChange={handleToggle}
-              className="relative"
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!isMonthly}
+            aria-label="Toggle annual billing"
+            onClick={() => handleToggle(isMonthly)}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-[var(--input)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
+              !isMonthly && "bg-[var(--primary)]",
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
+                !isMonthly ? "translate-x-5" : "translate-x-0",
+              )}
             />
-          </Label>
+          </button>
           <span className="text-xs font-semibold text-[var(--foreground)] sm:text-sm">
             Annual billing <span className="text-[var(--accent)]">(Save 20%)</span>
           </span>
