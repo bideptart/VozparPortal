@@ -15,7 +15,7 @@ const DEFAULT_CONFIG = {
   systemPrompt: 'You are a helpful customer support assistant. Be concise, friendly, and professional.',
   knowledgeBase: 'ABOUT US\n- What we do:\n- Hours:\n\nFAQ\n- Pricing:\n- Returns:',
   widgetTitle: 'Chat with us',
-  accentColor: '#4d7c0f',
+  accentColor: '#046bd2',
   position: 'bottom-right',
   mode: 'popup',
   theme: 'light',
@@ -84,7 +84,7 @@ export default function ChatAgentDetail() {
 
   return (
     <div>
-      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm text-lime-700 hover:underline">
+      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] hover:underline">
         <ArrowLeft size={14} /> All agents
       </Link>
 
@@ -248,7 +248,7 @@ export default function ChatAgentDetail() {
               <div className={cfg.size === 'large' ? 'px-5 py-4' : 'px-4 py-3'} style={{ background: cfg.accentColor }}>
                 <div className={`text-white font-semibold ${cfg.size === 'large' ? 'text-base' : 'text-sm'}`}>{cfg.widgetTitle || 'Chat with us'}</div>
                 <div className="text-white/80 text-xs flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-lime-300 inline-block" /> Online
+                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#8fd0ff' }} /> Online
                 </div>
               </div>
               <div className={`space-y-2 ${cfg.size === 'large' ? 'p-4 min-h-[220px]' : 'p-3 min-h-[160px]'}`} style={{ background: cfg.theme === 'dark' ? '#232a3d' : '#f6f8f1' }}>

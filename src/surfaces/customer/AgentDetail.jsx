@@ -1,22 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Phone, Globe, Mic, MoreVertical, ChevronRight, ChevronDown, IdCard, BookOpen, Target,
-  Circle, Play, Square, CheckCircle2, SlidersHorizontal, Check, Database, X, Lock, Puzzle, FileEdit, Sparkles,
-  PhoneCall, CalendarCheck, Ticket,
+  ArrowLeft, Globe, Mic, ChevronRight, ChevronDown, IdCard, BookOpen, Target,
+  Circle, CheckCircle2, Check, Database, X, Lock, Puzzle, FileEdit, Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 import { readCache, writeCache } from '../../utils/swrCache.js';
-import { useVoicePreview } from '../../hooks/useVoicePreview.js';
 import { VOICES, LANGUAGES, gradientFor, statusMeta } from './KbAgent.jsx';
 import { TEMPLATES } from './Templates.jsx';
 import { loadKbTemplates, qaCount } from './kbTemplatesStore.js';
 
 const TABS = [
   { id: 'identity', label: 'Identity', Icon: IdCard },
-  { id: 'voice',    label: 'Voice',    Icon: Mic },
   { id: 'knowledge', label: 'Knowledge', Icon: BookOpen },
+  { id: 'voice',    label: 'Voice',    Icon: Mic },
   { id: 'behavior', label: 'Behavior', Icon: Target },
 ];
 
@@ -80,6 +78,77 @@ const emptyDraft = () => ({
   label: '', agentName: '', greeting: '', prompt: '',
   voice: 'Kore', language: 'en-US', kbCompany: '', kbFaqs: '',
 });
+
+const MOCK_AGENT_DETAILS = {
+  '1e0e75ae-3ff0-4027-9b1d-31a9cd6d430c': {
+    id: '1e0e75ae-3ff0-4027-9b1d-31a9cd6d430c',
+    label: 'Sushi Agent',
+    agentName: 'Sushi Agent',
+    greeting: 'こんにちは!',
+    prompt: `You are Amelia, the voice assistant for TKOS (Tech Knowledge Open Systems), a carrier-grade UCaaS platform positioned as "Africa's #1 Dynamic & Reliable Communication Solution."
+
+Tone & Style:
+- Warm, articulate, and professional
+- Keep answers direct and clear
+- Ask follow-up questions only when needed
+- Never guess if the knowledge base does not cover the answer
+
+Role & Safety:
+- Book meetings only for explicit appointment requests
+- For support issues, complaints, or callback requests, take a message instead
+- Use the knowledge base for factual answers
+- Escalate politely when the caller needs a human handoff`,
+    voice: 'Kore',
+    language: 'en-US',
+    kbCompany: `PRODUCT / SERVICE
+TKOS is a cloud-based communication platform built for business telephony, call routing, unified communication, and customer engagement.
+
+CAPABILITIES
+- UCaaS voice calling
+- Call routing and IVR
+- Contact center support
+- Number provisioning
+- Business messaging
+
+CHANNELS
+- Phone
+- Web
+- Support desk
+
+BUSINESS MODEL
+- Monthly subscription
+- Plan-based pricing
+- Setup and service options available`,
+    kbFaqs: `Q: What exactly does TKOS do?
+A: TKOS provides business communication tools including cloud calling, routing, UCaaS features, and customer engagement support.
+
+Q: Which services does your product include?
+A: Services include voice calling, IVR and call routing, number provisioning, business messaging, and customer support capabilities.
+
+Q: Is this for small businesses or larger teams?
+A: TKOS is designed for business use and supports growing teams that need reliable communication infrastructure.
+
+Q: Where is the company located?
+A: The company serves business communication needs and can provide location details through the support team when required.`,
+    value: '+18173496752',
+    status: 'ready',
+    plan: { label: 'Starter' },
+    source: 'mock',
+  },
+};
+
+function draftFromAgent(agent) {
+  return {
+    label: agent.label || '',
+    agentName: agent.agentName || '',
+    greeting: agent.greeting || '',
+    prompt: agent.prompt || '',
+    voice: agent.voice || 'Kore',
+    language: agent.language || 'en-US',
+    kbCompany: agent.kbCompany || '',
+    kbFaqs: agent.kbFaqs || '',
+  };
+}
 
 // Fixed platform-wide guardrails applied on top of every agent's own prompt
 // — not per-agent data, so there's nothing to fetch or save here; this is
@@ -150,7 +219,6 @@ export default function AgentDetail() {
   const { currentUser } = useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { playingVoice, error: previewError, play } = useVoicePreview();
 
   const [numbers, setNumbers] = useState(() => readCache('agentDetail.numbers', currentUser?.id) ?? []);
   const [loaded, setLoaded] = useState(false);
@@ -198,8 +266,6 @@ export default function AgentDetail() {
   }, []);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
 
   // Call-behavior tuning — UI-only for now. There's no interruption
   // sensitivity / noise-reduction / turn-detection field on user_numbers in
@@ -262,30 +328,17 @@ export default function AgentDetail() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onClick = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [menuOpen]);
-
-  const wantId = searchParams.get('n');
+  const wantId = searchParams.get('n') || searchParams.get('id');
   const selected = useMemo(() => {
-    return numbers.find((n) => n.id === wantId) || numbers[0] || null;
+    return numbers.find((n) => n.id === wantId)
+      || MOCK_AGENT_DETAILS[wantId]
+      || numbers[0]
+      || null;
   }, [numbers, wantId]);
 
   useEffect(() => {
     if (!selected) return;
-    const d = {
-      label:     selected.label     || '',
-      agentName: selected.agentName || '',
-      greeting:  selected.greeting  || '',
-      prompt:    selected.prompt    || '',
-      voice:     selected.voice     || 'Kore',
-      language:  selected.language  || 'en-US',
-      kbCompany: selected.kbCompany || '',
-      kbFaqs:    selected.kbFaqs    || '',
-    };
+    const d = draftFromAgent(selected);
     setDraft(d);
     setSavedDraft(d);
   }, [selected]);
@@ -330,13 +383,13 @@ export default function AgentDetail() {
     || draft.kbCompany !== savedDraft.kbCompany
     || draft.kbFaqs !== savedDraft.kbFaqs;
 
-  // Whether a knowledge base is currently applied — just the Knowledge tab's
-  // own fields having content, not a separate id to track (picking a new
-  // one always overwrites these directly, so this stays accurate for free).
-  const hasKb = (draft.kbCompany || '').trim().length > 0 || (draft.kbFaqs || '').trim().length > 0;
-
   const save = async () => {
     if (!selected) return;
+    if (selected.source === 'mock') {
+      setSaveErr('');
+      setSavedDraft(draft);
+      return;
+    }
     setSaving(true);
     setSaveErr('');
     try {
@@ -371,7 +424,7 @@ export default function AgentDetail() {
   if (loaded && !selected) {
     return (
       <div>
-        <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm text-lime-700 hover:underline">
+        <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] hover:underline">
           <ArrowLeft size={14} /> All agents
         </Link>
         <div className="mt-6 form-card text-center py-12 text-mute">Agent not found.</div>
@@ -383,19 +436,19 @@ export default function AgentDetail() {
   // Same wording as the AgentsList status pill ("Live" for ready/active),
   // not statusMeta's more generic "Active" label.
   const statusLabel = statusMeta(selected.status).label === 'Active' ? 'Live' : statusMeta(selected.status).label;
-  const name = (selected.agentName || selected.label || 'Agent').trim();
+  const name = (selected.value === '+18173496752'
+    ? (draft.agentName || selected.agentName || 'Sushi Agent')
+    : (draft.label || selected.agentName || selected.label || 'Agent')).trim();
   const initial = (name[0] || '#').toUpperCase();
-  const lang = LANGUAGES.find((l) => l.value === draft.language);
-  const voiceMeta = VOICES.find((v) => v.value === draft.voice);
 
   return (
     <div>
-      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm text-lime-700 hover:underline">
+      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] hover:underline">
         <ArrowLeft size={14} /> All agents
       </Link>
 
       {/* === Agent header card ======================================= */}
-      <div className="mt-4 form-card flex items-start justify-between gap-4 flex-wrap">
+      <div className="mt-4 form-card flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
@@ -406,14 +459,10 @@ export default function AgentDetail() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-display font-bold text-lg truncate">{name}</span>
-              <span className="pill bg-lime-100 text-lime-700"><Circle size={8} fill="currentColor" /> {statusLabel.toUpperCase()}</span>
+              <span className="pill" style={{ background: 'rgba(4,107,210,0.14)', color: 'var(--primary)' }}><Circle size={8} fill="currentColor" /> {statusLabel.toUpperCase()}</span>
               <span className="pill" style={{ background: 'var(--line-2)', color: 'var(--ink-3)' }}>{(selected.plan?.label || 'Starter').toUpperCase()}</span>
             </div>
-            <div className="mt-1 flex items-center gap-3 text-xs text-mute flex-wrap">
-              <span className="inline-flex items-center gap-1"><Phone size={12} /> {selected.value || '—'}</span>
-              <span className="inline-flex items-center gap-1"><Globe size={12} /> {lang?.label || draft.language}</span>
-              <span className="inline-flex items-center gap-1"><Mic size={12} /> {voiceMeta?.label || draft.voice} · {voiceMeta?.gender === 'male' ? 'Male' : 'Female'}</span>
-            </div>
+            <div className="mt-1 text-xs text-mute">Editing mode</div>
           </div>
         </div>
 
@@ -421,54 +470,6 @@ export default function AgentDetail() {
           <div className="rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--surface-tint)' }}>
             <div className="uppercase tracking-wide font-semibold" style={{ color: 'var(--ink-3)', fontSize: 9 }}>Test it</div>
             <div className="font-mono font-semibold" style={{ color: 'var(--ink)' }}>Dial {selected.value || '—'}</div>
-          </div>
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              className="w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-[var(--surface-2)]"
-              style={{ borderColor: 'var(--line)' }}
-              aria-label="More options"
-            >
-              <MoreVertical size={16} />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 py-1">
-                <Link
-                  to={`${basePath}/numbers`}
-                  className="block px-4 py-2 text-sm hover:bg-[var(--surface-2)]"
-                  style={{ color: 'var(--ink-2)' }}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Manage in Numbers
-                </Link>
-                <div className="my-1 border-t" style={{ borderColor: 'var(--line-2)' }} />
-                <Link
-                  to={`${basePath}/analytics`}
-                  className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[var(--surface-2)]"
-                  style={{ color: 'var(--ink-2)' }}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <PhoneCall size={14} /> Call history
-                </Link>
-                <Link
-                  to={`${basePath}/booking-history`}
-                  className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[var(--surface-2)]"
-                  style={{ color: 'var(--ink-2)' }}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <CalendarCheck size={14} /> Booking history
-                </Link>
-                <Link
-                  to={`${basePath}/tickets`}
-                  className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[var(--surface-2)]"
-                  style={{ color: 'var(--ink-2)' }}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <Ticket size={14} /> Tickets
-                </Link>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -493,8 +494,8 @@ export default function AgentDetail() {
       </div>
 
       {/* === Jump nav — scrolls to each section on this single page ===== */}
-      <div className="mt-4 form-card p-0 overflow-hidden sticky top-16 z-20">
-        <div className="flex border-b" style={{ borderColor: 'var(--line-2)' }}>
+      <div className="mt-4 form-card p-0 overflow-hidden sticky top-16 z-20" style={{ background: 'var(--popover)', borderColor: 'rgba(96,165,250,0.2)' }}>
+        <div className="flex border-b" style={{ borderColor: 'rgba(96,165,250,0.18)' }}>
           {TABS.map((t, i) => {
             const active = activeSection === t.id;
             return (
@@ -504,7 +505,7 @@ export default function AgentDetail() {
                 onClick={() => scrollToSection(t.id)}
                 className={`flex-1 inline-flex items-center justify-center gap-1.5 py-3 text-sm border-b-2 transition-colors duration-150 ${i > 0 ? 'border-l' : ''} ${active ? 'font-semibold' : 'font-medium'}`}
                 style={{
-                  borderLeftColor: 'var(--line-2)',
+                  borderLeftColor: 'rgba(96,165,250,0.18)',
                   borderBottomColor: active ? 'var(--primary)' : 'transparent',
                   color: active ? 'var(--primary)' : 'var(--ink-3)',
                 }}
@@ -516,11 +517,8 @@ export default function AgentDetail() {
         </div>
       </div>
 
-      {/* === All sections stacked on one page (jump nav above just scrolls
-          to them) instead of a multi-step tabbed wizard. ================ */}
-      <div className="mt-4 form-card p-0 overflow-hidden">
-        <div className="p-6 space-y-10">
-          <div ref={identityRef} data-section="identity" style={{ scrollMarginTop: 140 }}>
+      <div className="mt-4 space-y-4">
+          <section ref={identityRef} data-section="identity" className="form-card" style={{ scrollMarginTop: 140 }}>
               <div className="text-xs font-mono uppercase tracking-wide" style={{ color: 'var(--primary)' }}>Agent identity</div>
               <p className="text-sm text-mute mt-1">Its display name, language, and the greeting callers hear first.</p>
 
@@ -538,101 +536,9 @@ export default function AgentDetail() {
 
               <label className="field-label mt-4">Greeting (first line on every call)</label>
               <textarea className="input" rows={4} value={draft.greeting} onChange={(e) => set({ greeting: e.target.value })} placeholder="Hi, thanks for calling…" />
-          </div>
+          </section>
 
-          <div ref={voiceRef} data-section="voice" className="pt-10 border-t" style={{ borderColor: 'var(--line-2)', scrollMarginTop: 140 }}>
-              <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
-                <Mic size={12} /> Voice
-              </div>
-              <div className="mt-4 space-y-1">
-                {VOICES.map((v) => {
-                  const sel = draft.voice === v.value;
-                  const playing = playingVoice === v.value;
-                  return (
-                    <div key={v.value} className={`voice-row${sel ? ' selected' : ''}`} onClick={() => set({ voice: v.value })}>
-                      <div>
-                        <div className="voice-name font-medium text-sm flex items-center gap-2">
-                          {v.label}{sel && <Check size={14} />}
-                          <span
-                            className="pill text-[9px]"
-                            style={v.gender === 'male'
-                              ? { background: 'rgba(77,124,15,0.12)', color: '#3a5a0c' }
-                              : { background: 'rgba(219,39,119,0.10)', color: '#be185d' }}
-                          >
-                            {v.gender === 'male' ? 'MALE' : 'FEMALE'}
-                          </span>
-                          {v.allLang && (
-                            <span className="pill text-[9px] bg-lime-100 text-lime-700">ALL-LANG</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-mute mt-0.5">{v.desc}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); play(v.value, 'en-US'); }}
-                        className={`ml-2 w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all duration-150 ${
-                          playing
-                            ? 'bg-lime-600 border-lime-600 text-white shadow-sm'
-                            : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-lime-600 hover:border-lime-600 hover:text-white hover:scale-105'
-                        }`}
-                        title={playing ? 'Stop preview' : 'Play 5-second preview'}
-                      >
-                        {playing ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              {previewError && <div className="mt-3 text-xs text-amber-600">{previewError}</div>}
-              <div className="mt-3 text-[11px] text-mute">Click a voice to select it. ▶ plays a 5-second preview.</div>
-
-              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--line-2)' }}>
-                <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
-                  <SlidersHorizontal size={12} /> Call behavior
-                </div>
-                <p className="text-sm text-mute mt-1">
-                  How the agent handles interruptions and background noise. The defaults stop it from cutting itself off mid-sentence.
-                </p>
-
-                <label className="field-label mt-4">Interruption sensitivity</label>
-                <div className="grid sm:grid-cols-3 gap-2">
-                  {SENSITIVITY_OPTIONS.map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => setSensitivity(o.id)}
-                      className="text-left rounded-lg border-2 px-3 py-2.5"
-                      style={sensitivity === o.id
-                        ? { borderColor: 'var(--primary)', background: 'var(--surface-tint)' }
-                        : { borderColor: 'var(--line)', background: '#fff' }}
-                    >
-                      <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{o.label}</div>
-                      <div className="text-xs text-mute mt-0.5">{o.desc}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="field-help">
-                  Higher = the agent needs more real words before it stops to listen, so a stray sound won't chop its speech.
-                </div>
-
-                <div className="divide-y" style={{ borderColor: 'var(--line-2)' }}>
-                  <Toggle
-                    on={reduceNoise}
-                    onChange={setReduceNoise}
-                    label="Reduce background noise"
-                    desc="Filters ambient noise so it won't trip the agent into stopping."
-                  />
-                  <Toggle
-                    on={smartTurnDetection}
-                    onChange={setSmartTurnDetection}
-                    label="Smart turn detection"
-                    desc="Waits until the caller has actually finished before it replies."
-                  />
-                </div>
-              </div>
-          </div>
-
-          <div ref={knowledgeRef} data-section="knowledge" className="pt-10 border-t" style={{ borderColor: 'var(--line-2)', scrollMarginTop: 140 }}>
+          <section ref={knowledgeRef} data-section="knowledge" className="form-card" style={{ scrollMarginTop: 140 }}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
@@ -665,43 +571,88 @@ export default function AgentDetail() {
                   <textarea className="input mt-1.5" rows={12} value={draft.kbFaqs} onChange={(e) => set({ kbFaqs: e.target.value })} placeholder={'Q: What are your business hours?\nA: We\'re open Mon–Fri 9–6.'} />
                 </div>
               </div>
+          </section>
 
-              {/* "Your knowledge bases" — reusable templates shared across
-                  agents via kbTemplatesStore.js (localStorage; see that file
-                  for why not a backend table). Click a card to apply it. */}
-              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--line-2)' }}>
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="text-xs font-mono uppercase tracking-wide" style={{ color: 'var(--ink-2)' }}>Your knowledge bases</div>
-                    <p className="text-sm text-mute mt-1">Saved setups you can reuse. Click one to load it into the fields above.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="text-sm font-semibold"
-                    style={{ color: 'var(--primary)' }}
-                    onClick={() => navigate(`${basePath}/kb`)}
-                  >
-                    Manage →
-                  </button>
+          <section ref={voiceRef} data-section="voice" className="form-card" style={{ scrollMarginTop: 140 }}>
+              <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
+                <Mic size={12} /> Voice
+              </div>
+              <div className="mt-4 space-y-1">
+                {VOICES.map((v) => {
+                  const sel = draft.voice === v.value;
+                  return (
+                    <div key={v.value} className={`voice-row${sel ? ' selected' : ''}`} onClick={() => set({ voice: v.value })}>
+                      <div>
+                        <div className="voice-name font-medium text-sm flex items-center gap-2">
+                          {v.label}{sel && <Check size={14} />}
+                          <span
+                            className="pill text-[9px]"
+                            style={v.gender === 'male'
+                              ? { background: 'rgba(4,107,210,0.12)', color: 'var(--primary)' }
+                              : { background: 'rgba(219,39,119,0.10)', color: '#be185d' }}
+                          >
+                            {v.gender === 'male' ? 'MALE' : 'FEMALE'}
+                          </span>
+                          {v.allLang && (
+                            <span className="pill text-[9px]" style={{ background: 'rgba(4,107,210,0.14)', color: 'var(--primary)' }}>ALL-LANG</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-mute mt-0.5">{v.desc}</div>
+                      </div>
+                      <ChevronRight size={16} className="text-mute" />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 text-[11px] text-mute">Click a voice row to make it the selected voice for this agent.</div>
+
+              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'rgba(96,165,250,0.18)' }}>
+                <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
+                  <Target size={12} /> Call behavior
                 </div>
-                <div className="mt-3 rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: 'var(--line)' }}>
-                  <Database size={22} className="mx-auto text-mute" />
-                  <div className="mt-2 font-semibold text-sm" style={{ color: 'var(--ink)' }}>
-                    {hasKb ? 'Knowledge base applied' : 'No knowledge base yet'}
-                  </div>
-                  <div className="text-xs text-mute mt-1">
-                    {hasKb
-                      ? 'Pick another to replace it, or manage your saved templates.'
-                      : 'Create one on the Knowledge Base page, then reuse it on any agent.'}
-                  </div>
-                  <button type="button" className="btn-teal text-sm mt-4" onClick={() => { setSourcePicker(true); setBrowsingKb(true); }}>
-                    {hasKb ? '+ Add more' : 'Import a knowledge base'}
-                  </button>
+                <p className="text-sm text-mute mt-1">
+                  How the agent handles interruptions and background noise. The defaults stop it from cutting itself off mid-sentence.
+                </p>
+
+                <label className="field-label mt-4">Interruption sensitivity</label>
+                <div className="grid sm:grid-cols-3 gap-2">
+                  {SENSITIVITY_OPTIONS.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setSensitivity(o.id)}
+                      className="text-left rounded-lg border-2 px-3 py-2.5"
+                      style={sensitivity === o.id
+                        ? { borderColor: 'var(--primary)', background: 'var(--surface-tint)' }
+                        : { borderColor: 'rgba(96,165,250,0.28)', background: 'var(--muted)' }}
+                    >
+                      <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{o.label}</div>
+                      <div className="text-xs text-mute mt-0.5">{o.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="field-help">
+                  Higher = the agent needs more real words before it stops to listen, so a stray sound won't chop its speech.
+                </div>
+
+                <div className="divide-y" style={{ borderColor: 'rgba(96,165,250,0.18)' }}>
+                  <Toggle
+                    on={reduceNoise}
+                    onChange={setReduceNoise}
+                    label="Reduce background noise"
+                    desc="Filters ambient noise so it won't trip the agent into stopping."
+                  />
+                  <Toggle
+                    on={smartTurnDetection}
+                    onChange={setSmartTurnDetection}
+                    label="Smart turn detection"
+                    desc="Waits until the caller has actually finished before it replies."
+                  />
                 </div>
               </div>
-          </div>
+          </section>
 
-          <div ref={behaviorRef} data-section="behavior" className="pt-10 border-t" style={{ borderColor: 'var(--line-2)', scrollMarginTop: 140 }}>
+          <section ref={behaviorRef} data-section="behavior" className="form-card" style={{ scrollMarginTop: 140 }}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
@@ -721,12 +672,12 @@ export default function AgentDetail() {
               <textarea className="input mt-4" rows={12} value={draft.prompt} onChange={(e) => set({ prompt: e.target.value })} placeholder="You are the AI receptionist for…" />
               <div className="field-help">{draft.prompt.length.toLocaleString()} / 50,000 chars</div>
 
-              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--line-2)' }}>
+              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'rgba(96,165,250,0.18)' }}>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="text-xs font-mono uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--primary)' }}>
                     <Target size={12} /> Standard rules
                   </div>
-                  <span className="pill bg-lime-100 text-lime-700"><Check size={10} /> Always on</span>
+                  <span className="pill" style={{ background: 'rgba(4,107,210,0.14)', color: 'var(--primary)' }}><Check size={10} /> Always on</span>
                 </div>
                 <p className="text-sm text-mute mt-1">
                   Applied automatically on top of your instructions above — every agent gets these. Shown for reference; they can't be edited.
@@ -736,7 +687,7 @@ export default function AgentDetail() {
                   {STANDARD_RULES.map((r) => {
                     const open = expandedRule === r.id;
                     return (
-                      <div key={r.id} className="rounded-lg border" style={{ borderColor: 'var(--line)' }}>
+                      <div key={r.id} className="rounded-lg border" style={{ borderColor: 'rgba(96,165,250,0.24)' }}>
                         <button
                           type="button"
                           onClick={() => setExpandedRule(open ? null : r.id)}
@@ -759,8 +710,7 @@ export default function AgentDetail() {
                   })}
                 </div>
               </div>
-          </div>
-        </div>
+          </section>
       </div>
 
       {/* === Save bar ================================================= */}
@@ -769,15 +719,15 @@ export default function AgentDetail() {
           {saveErr ? (
             <span className="text-red-600">{saveErr}</span>
           ) : dirty ? (
-            'Unsaved changes'
+            'Review the sections above, then submit — changes go live after saving.'
           ) : (
-            <><CheckCircle2 size={14} className="text-lime-600" /> All changes saved</>
+            <><CheckCircle2 size={14} className="text-[var(--primary)]" /> All changes saved</>
           )}
         </span>
         <div className="flex items-center gap-2">
           <button type="button" className="btn-ghost text-sm" disabled={!dirty} onClick={discard}>Discard</button>
           <button type="button" className="btn-teal text-sm" disabled={!dirty || saving} onClick={save}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : 'Save and submit'}
           </button>
         </div>
       </div>
@@ -955,7 +905,7 @@ export default function AgentDetail() {
                         style={{ borderColor: 'var(--line)' }}
                       >
                         <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--surface-2)' }}>
-                          <Database size={16} className="text-lime-600" />
+                          <Database size={16} className="text-[var(--primary)]" />
                         </span>
                         <span className="min-w-0">
                           <span className="block font-semibold text-sm truncate" style={{ color: 'var(--ink)' }}>{t.name}</span>
