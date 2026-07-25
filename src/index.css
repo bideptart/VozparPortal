@@ -308,6 +308,34 @@ p {
     animation: modal-border-shadow 2.6s ease-in-out infinite;
   }
 
+  .kb-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .kb-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    color: #dbe7f5;
+    transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+  }
+
+  .kb-modal-close:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 6px 18px -6px var(--glow-strong, var(--glow));
+  }
+
   .kb-modal-import {
     border: 1px solid rgba(148, 163, 184, 0.16);
     border-radius: 10px;

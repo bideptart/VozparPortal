@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { BookOpen, Bot, Plus, FileText, Globe, Upload } from 'lucide-react';
+import { BookOpen, Bot, Plus, FileText, Globe, Upload, X } from 'lucide-react';
 
 const DUMMY_KB = [
   { id: 'kb_1', name: 'Sales FAQ', agent: 'Sales Agent', questions: 24, lastUpdated: '2 days ago' },
@@ -121,9 +121,21 @@ export default function KnowledgeBase() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-5 sm:p-6">
-              <div className="text-[28px] font-semibold text-[var(--foreground)]">New knowledge base</div>
-              <div className="mt-1 text-sm text-[var(--body)]">
-                A reusable template you can apply to any agent later.
+              <div className="kb-modal-header">
+                <div>
+                  <div className="text-[28px] font-semibold text-[var(--foreground)]">New knowledge base</div>
+                  <div className="mt-1 text-sm text-[var(--body)]">
+                    A reusable template you can apply to any agent later.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="kb-modal-close"
+                  onClick={closeCreate}
+                  aria-label="Close knowledge base modal"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
               <div className="kb-modal-import mt-4">
