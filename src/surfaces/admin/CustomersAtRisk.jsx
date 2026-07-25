@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, AlertOctagon, AlertTriangle, DollarSign } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -96,12 +96,7 @@ function assessRisk(u) {
   return { dids, totalMin, usedMin, usagePct, mrr, reasons, severity, score };
 }
 
-const SEVERITY_STYLE = {
-  critical: { icon: AlertOctagon, bar: 'bg-red-500', ring: 'ring-red-500/40', iconWrap: 'bg-red-500/15 text-red-400' },
-  warning:  { icon: AlertTriangle, bar: 'bg-amber-500', ring: 'ring-amber-500/40', iconWrap: 'bg-amber-500/15 text-amber-400' },
-};
-
-function ReasonTag({ id }) {
+function ReasonPill({ id }) {
   const r = REASONS[id];
   if (!r) return null;
   const cls = r.severity === 'critical' ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400';
@@ -112,52 +107,12 @@ function ReasonTag({ id }) {
   );
 }
 
-// Alert-feed pattern instead of a table — each flagged customer reads as
-// an incident (severity accent bar, icon, reason tags), the way a
-// monitoring/alerting dashboard lists active alerts rather than rows of
-// a spreadsheet.
-function AlertRow({ user: u, risk }) {
-  const style = SEVERITY_STYLE[risk.severity];
-  const Icon = style.icon;
+function UsageBar({ pct }) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-lime-500';
   return (
-    <div className={`relative form-card overflow-hidden ring-1 ${style.ring}`}>
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${style.bar}`} aria-hidden="true" />
-      <div className="pl-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${style.iconWrap}`}>
-            <Icon className="w-4 h-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="font-semibold text-[var(--foreground)] truncate">{u.company || u.name}</div>
-            <div className="text-xs text-mute truncate">{u.email}</div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {risk.reasons.map((id) => <ReasonTag key={id} id={id} />)}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-5 md:gap-6 shrink-0 pl-12 md:pl-0">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-mute">Usage</div>
-            {risk.totalMin > 0 ? (
-              <div className="flex items-center gap-2 mt-1">
-                <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className={`h-full rounded-full ${style.bar}`} style={{ width: `${Math.min(100, risk.usagePct)}%` }} />
-                </div>
-                <span className="text-xs text-mute whitespace-nowrap">{risk.usedMin.toFixed(0)}/{risk.totalMin}m</span>
-              </div>
-            ) : <div className="text-xs text-mute italic mt-1">—</div>}
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-mute">MRR</div>
-            <div className="text-sm font-semibold text-[var(--foreground)] mt-1">{fmtUSD(risk.mrr)}</div>
-          </div>
-          <div className="hidden lg:block">
-            <div className="text-[10px] uppercase tracking-wider text-mute">Signed up</div>
-            <div className="text-xs text-mute mt-1">{fmtDate(u.createdAt)}</div>
-          </div>
-        </div>
-      </div>
+    <div className="w-24 h-1.5 rounded-full bg-white/10 overflow-hidden">
+      <div className={`h-full rounded-full ${color}`} style={{ width: `${clamped}%` }} />
     </div>
   );
 }
@@ -224,55 +179,95 @@ export default function CustomersAtRisk() {
 
       {err && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
-      {/* Severity meter — a single composition bar instead of separate
-          boxed KPI tiles, plus filter chips that double as the legend. */}
-      <div className="form-card">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-[var(--foreground)]">{total}</span>
-            <span className="text-sm text-mute">customer{total === 1 ? '' : 's'} flagged</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {['all', 'critical', 'warning'].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`pill text-[10px] uppercase tracking-wider font-semibold transition-colors ${
-                  filter === f
-                    ? f === 'critical' ? 'bg-red-500/25 text-red-400' : f === 'warning' ? 'bg-amber-500/25 text-amber-400' : 'bg-[var(--glow)] text-[var(--primary)]'
-                    : 'bg-white/5 text-mute hover:text-[var(--foreground)]'
-                }`}
-              >
-                {f === 'all' ? `All (${total})` : f === 'critical' ? `Critical (${criticalCount})` : `Warning (${warningCount})`}
-              </button>
-            ))}
-          </div>
-        </div>
-        {total > 0 && (
-          <div className="h-2 rounded-full bg-white/10 overflow-hidden flex">
-            <div className="h-full bg-red-500" style={{ width: `${(criticalCount / total) * 100}%` }} title={`${criticalCount} critical`} />
-            <div className="h-full bg-amber-500" style={{ width: `${(warningCount / total) * 100}%` }} title={`${warningCount} warning`} />
-          </div>
-        )}
-        <div className="mt-3 flex items-center gap-1.5 text-sm text-[var(--body)]">
-          <DollarSign className="w-4 h-4" /> <span className="font-semibold text-[var(--foreground)]">{fmtUSD(mrrAtRisk)}</span> in monthly revenue at risk
+      {/* Plain stat tiles that double as filters — simple to scan at a
+          glance, no extra chart/meter to interpret. */}
+      <div className="grid sm:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setFilter('all')}
+          className={`form-card text-left transition ${filter === 'all' ? 'ring-2 ring-[var(--primary)]' : ''}`}
+        >
+          <div className="text-xs text-mute uppercase">Total at risk</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{total}</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('critical')}
+          className={`form-card text-left transition ${filter === 'critical' ? 'ring-2 ring-red-500' : ''}`}
+        >
+          <div className="text-xs text-mute uppercase">Critical</div>
+          <div className="mt-1 text-2xl font-semibold text-red-400">{criticalCount}</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('warning')}
+          className={`form-card text-left transition ${filter === 'warning' ? 'ring-2 ring-amber-500' : ''}`}
+        >
+          <div className="text-xs text-mute uppercase">Warning</div>
+          <div className="mt-1 text-2xl font-semibold text-amber-400">{warningCount}</div>
+        </button>
+        <div className="form-card">
+          <div className="text-xs text-mute uppercase">MRR at risk</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--accent)]">{fmtUSD(mrrAtRisk)}</div>
         </div>
       </div>
 
-      {filteredRows === null && <div className="form-card text-center text-mute py-10">Loading…</div>}
-      {filteredRows?.length === 0 && (
-        <div className="form-card text-center text-mute py-10">
-          {total === 0
-            ? '✓ No customers currently flagged — everyone is provisioned, within their plan, and active.'
-            : 'No customers match this filter.'}
-        </div>
-      )}
-      {filteredRows && filteredRows.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filteredRows.map((r) => <AlertRow key={r.user.id} user={r.user} risk={r.risk} />)}
-        </div>
-      )}
+      <div className="form-card p-0 overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Risk signals</th>
+              <th>Usage</th>
+              <th>Plan</th>
+              <th className="text-right">MRR</th>
+              <th>Signed up</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows === null && <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>}
+            {filteredRows?.length === 0 && (
+              <tr><td colSpan={6} className="text-center text-mute py-10">
+                {total === 0
+                  ? '✓ No customers currently flagged — everyone is provisioned, within their plan, and active.'
+                  : 'No customers match this filter.'}
+              </td></tr>
+            )}
+            {(filteredRows || []).map(({ user: u, risk }) => (
+              <tr key={u.id}>
+                <td>
+                  <div className="font-medium">{u.company || u.name}</div>
+                  <div className="text-xs text-mute">{u.email}</div>
+                </td>
+                <td>
+                  <div className="flex flex-wrap gap-1.5 max-w-xs">
+                    {risk.reasons.map((id) => <ReasonPill key={id} id={id} />)}
+                  </div>
+                </td>
+                <td>
+                  {risk.totalMin > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <UsageBar pct={risk.usagePct} />
+                      <span className="text-xs text-mute whitespace-nowrap">
+                        {risk.usedMin.toFixed(1)} / {risk.totalMin} min
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-mute text-xs italic">no plan minutes</span>
+                  )}
+                </td>
+                <td className="text-sm">
+                  {risk.dids.length > 0
+                    ? risk.dids.map((d) => d.plan?.label).filter(Boolean).join(', ') || '—'
+                    : <span className="text-mute italic">none</span>}
+                </td>
+                <td className="text-right font-semibold text-[var(--accent)]">{fmtUSD(risk.mrr)}</td>
+                <td className="text-xs text-mute">{fmtDate(u.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
