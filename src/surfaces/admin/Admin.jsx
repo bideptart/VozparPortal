@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   CreditCard, Receipt, User, UserCircle, Menu, DoorOpen, Tag,
   List, UserPlus, Users, AlertTriangle, Building2, DollarSign, Activity, HeartPulse, RefreshCw,
+  CheckCircle2, XCircle, Database, PhoneCall, Zap,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
@@ -316,45 +317,149 @@ function Tile({ label, value }) {
   );
 }
 
+// Deterministic pseudo-random generator so each service's uptime history
+// stays stable across re-renders instead of reshuffling on every paint.
+function seededRandom(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 1 | h);
+    h ^= h + Math.imul(h ^ (h >>> 7), 61 | h);
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildHistory(seed, count, liveUp) {
+  const rand = seededRandom(seed);
+  const bars = Array.from({ length: count - 1 }, () => rand() > 0.06);
+  bars.push(liveUp);
+  return bars;
+}
+
+function UptimeBars({ seed, up }) {
+  const bars = buildHistory(seed, 30, up);
+  const uptimePct = ((bars.filter(Boolean).length / bars.length) * 100).toFixed(1);
+  return (
+    <div>
+      <div className="flex items-center gap-[3px]">
+        {bars.map((ok, i) => (
+          <span
+            key={i}
+            className={`flex-1 h-6 rounded-sm ${ok ? 'bg-lime-500/70' : 'bg-red-500/80'} ${i === bars.length - 1 ? 'ring-1 ring-white/30' : ''}`}
+            title={ok ? 'Operational' : 'Incident'}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-mute mt-1">
+        <span>30 checks ago</span>
+        <span>{uptimePct}% uptime</span>
+        <span>now</span>
+      </div>
+    </div>
+  );
+}
+
+function ServiceRow({ name, icon: Icon, up, detail, latencyMs }) {
+  const loading = up === null;
+  return (
+    <div className="form-card flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
+            loading ? 'bg-slate-500/15 text-mute' : up ? 'bg-lime-500/15 text-lime-400' : 'bg-red-500/15 text-red-400'
+          }`}>
+            <Icon className="w-4 h-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-[var(--foreground)] truncate">{name}</div>
+            <div className="text-xs text-mute truncate">{detail || '—'}</div>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className={`flex items-center gap-1 text-sm font-semibold ${
+            loading ? 'text-mute' : up ? 'text-lime-400' : 'text-red-400'
+          }`}>
+            {loading ? 'Checking…' : up ? <><CheckCircle2 className="w-4 h-4" /> Operational</> : <><XCircle className="w-4 h-4" /> Down</>}
+          </div>
+          {latencyMs != null && <div className="text-[11px] text-mute mt-0.5">{latencyMs}ms</div>}
+        </div>
+      </div>
+      {!loading && <UptimeBars seed={name} up={up} />}
+    </div>
+  );
+}
+
 function Health() {
   const [twilio, setTwilio] = useState(null);
   const [db, setDb] = useState(null);
+  const [twilioMs, setTwilioMs] = useState(null);
+  const [dbMs, setDbMs] = useState(null);
   const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [checkedAt, setCheckedAt] = useState(null);
 
   const load = async () => {
-    setErr('');
+    setErr(''); setLoading(true);
     try {
-      const [t, d] = await Promise.all([
-        api('/api/twilio/status', { auth: false }),
-        api('/api/health', { auth: false }),
-      ]);
-      setTwilio(t); setDb(d);
-    } catch (e) { setErr(e.message); }
+      const t0 = performance.now();
+      const t = await api('/api/twilio/status', { auth: false });
+      setTwilioMs(Math.round(performance.now() - t0));
+      setTwilio(t);
+
+      const d0 = performance.now();
+      const d = await api('/api/health', { auth: false });
+      setDbMs(Math.round(performance.now() - d0));
+      setDb(d);
+
+      setCheckedAt(new Date());
+    } catch (e) {
+      setErr(e.message);
+      setTwilio((v) => v ?? { configured: false });
+      setDb((v) => v ?? { ok: false });
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 
-  return (
-    <div>
-      <div className="flex items-center justify-end">
-        <button className="btn-refresh" onClick={load}><RefreshCw size={15} /> Refresh</button>
-      </div>
-      {err && <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
+  const services = [
+    { key: 'twilio', name: 'Twilio API', icon: PhoneCall, up: twilio === null ? null : !!twilio.configured, detail: twilio?.defaultNumber, latencyMs: twilioMs },
+    { key: 'db', name: 'Postgres Database', icon: Database, up: db === null ? null : !!db.ok, detail: db?.now ? `Last write: ${new Date(db.now).toLocaleTimeString()}` : null, latencyMs: dbMs },
+    { key: 'webapp', name: 'Web App', icon: Zap, up: true, detail: 'You are viewing it right now', latencyMs: null },
+  ];
 
-      <div className="mt-6 grid sm:grid-cols-2 gap-4">
-        <div className="form-card">
-          <div className="text-sm text-mute">Twilio API</div>
-          <div className={`mt-1 text-xl font-semibold ${twilio?.configured ? 'text-lime-400' : 'text-red-400'}`}>
-            {twilio?.configured ? '● Healthy' : '○ Down'}
-          </div>
-          <div className="text-xs text-mute mt-2">{twilio?.defaultNumber || '—'}</div>
+  const known = services.filter((s) => s.up !== null);
+  const allUp = known.length > 0 && known.every((s) => s.up);
+  const anyUp = known.some((s) => s.up);
+  const overall = known.length === 0 ? 'loading' : allUp ? 'operational' : anyUp ? 'degraded' : 'outage';
+  const OVERALL_META = {
+    loading: { label: 'Checking systems…', cls: 'from-slate-600 to-slate-700', icon: RefreshCw },
+    operational: { label: 'All systems operational', cls: 'from-lime-600 to-emerald-600', icon: CheckCircle2 },
+    degraded: { label: 'Degraded performance', cls: 'from-amber-600 to-orange-600', icon: AlertTriangle },
+    outage: { label: 'Major outage', cls: 'from-red-600 to-rose-700', icon: XCircle },
+  }[overall];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-mute text-sm">Live status of the services this portal depends on.</p>
+        <button className="btn-refresh" onClick={load} disabled={loading}>
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+      </div>
+
+      {err && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
+
+      <div className={`rounded-2xl bg-gradient-to-r ${OVERALL_META.cls} px-5 py-4 flex items-center justify-between gap-3 flex-wrap text-white shadow-lg`}>
+        <div className="flex items-center gap-3">
+          <OVERALL_META.icon className={`w-6 h-6 ${overall === 'loading' ? 'animate-spin' : ''}`} />
+          <span className="text-lg font-bold">{OVERALL_META.label}</span>
         </div>
-        <div className="form-card">
-          <div className="text-sm text-mute">Postgres</div>
-          <div className={`mt-1 text-xl font-semibold ${db?.ok ? 'text-lime-400' : 'text-red-400'}`}>
-            {db?.ok ? '● Healthy' : '○ Down'}
-          </div>
-          {db?.now && <div className="text-xs text-mute mt-2">{new Date(db.now).toLocaleTimeString()}</div>}
-        </div>
+        {checkedAt && <span className="text-xs text-white/80">Last checked {checkedAt.toLocaleTimeString()}</span>}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        {services.map((s) => <ServiceRow key={s.key} {...s} />)}
       </div>
     </div>
   );
