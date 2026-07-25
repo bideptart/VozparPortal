@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Calendar } from 'lucide-react';
+import { RefreshCw, Calendar, ChevronDown, DollarSign } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -41,8 +41,8 @@ const initials = (name) => (name || '?')
 
 // Shown only when the real customer list comes back genuinely empty — same
 // "never overrides real data" rule as the other admin pages' demo
-// fallbacks. Deliberately spans every risk reason so the redesigned page
-// has something of each severity to show.
+// fallbacks. Deliberately spans every risk reason so the page has
+// something of each severity to show.
 const DEMO_USERS = [
   // Over limit (critical) — used more than the plan includes.
   { id: 'demo-1', company: 'Fernhill Logistics', name: 'Jack Turner', email: 'jack@fernhill.example', createdAt: daysAgo(20), minutesUsed: 612,
@@ -116,8 +116,73 @@ function UsageBar({ pct }) {
   const clamped = Math.min(100, Math.max(0, pct));
   const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-lime-500';
   return (
-    <div className="w-24 h-1.5 rounded-full bg-white/10 overflow-hidden">
+    <div className="w-28 h-1.5 rounded-full bg-white/10 overflow-hidden">
       <div className={`h-full rounded-full ${color}`} style={{ width: `${clamped}%` }} />
+    </div>
+  );
+}
+
+// Accordion pattern — each flagged customer collapses to one compact line
+// (avatar, name, severity, MRR) so the list stays simple at a glance;
+// clicking a row expands it to reveal the full risk breakdown. Different
+// from both the earlier alert-card layout and the flat always-expanded
+// table, and keeps the collapsed state genuinely simple.
+function RiskRow({ user: u, risk, expanded, onToggle }) {
+  const isCritical = risk.severity === 'critical';
+  return (
+    <div className={`form-card p-0 overflow-hidden transition-shadow ${expanded ? 'ring-1 ' + (isCritical ? 'ring-red-500/40' : 'ring-amber-500/40') : ''}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.03] transition-colors"
+        aria-expanded={expanded}
+      >
+        <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-[11px] font-bold">
+          {initials(u.company || u.name)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-[var(--foreground)] truncate">{u.company || u.name}</div>
+          <div className="text-xs text-mute truncate">{u.email}</div>
+        </div>
+        <span className={`pill text-[10px] uppercase tracking-wider font-semibold shrink-0 ${
+          isCritical ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400'
+        }`}>
+          {isCritical ? 'Critical' : 'Warning'}
+        </span>
+        <span className="text-sm font-semibold text-[var(--accent)] shrink-0 w-14 text-right">{fmtUSD(risk.mrr)}</span>
+        <ChevronDown className={`w-4 h-4 text-mute shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 border-t border-[var(--border)] animate-fade-up">
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {risk.reasons.map((id) => <ReasonPill key={id} id={id} />)}
+          </div>
+          <div className="mt-3 grid sm:grid-cols-3 gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-mute font-semibold mb-1.5">Usage</div>
+              {risk.totalMin > 0 ? (
+                <div className="flex items-center gap-2">
+                  <UsageBar pct={risk.usagePct} />
+                  <span className="text-xs text-mute whitespace-nowrap">{risk.usedMin.toFixed(1)} / {risk.totalMin} min</span>
+                </div>
+              ) : <span className="text-mute text-xs italic">no plan minutes</span>}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-mute font-semibold mb-1.5">Plan</div>
+              <div className="text-sm">
+                {risk.dids.length > 0
+                  ? risk.dids.map((d) => d.plan?.label).filter(Boolean).join(', ') || '—'
+                  : <span className="text-mute italic">none</span>}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-mute font-semibold mb-1.5">Signed up</div>
+              <div className="text-xs text-mute flex items-center gap-1"><Calendar className="w-3 h-3" /> {fmtDate(u.createdAt)}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -128,6 +193,7 @@ export default function CustomersAtRisk() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all | critical | warning
+  const [expandedId, setExpandedId] = useState(null);
 
   const load = async () => {
     setErr(''); setLoading(true);
@@ -170,6 +236,12 @@ export default function CustomersAtRisk() {
   const mrrAtRisk = rows?.reduce((a, r) => a + r.risk.mrr, 0) ?? 0;
   const total = rows?.length ?? 0;
 
+  const TABS = [
+    { key: 'all', label: 'All', count: total },
+    { key: 'critical', label: 'Critical', count: criticalCount },
+    { key: 'warning', label: 'Warning', count: warningCount },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -184,109 +256,54 @@ export default function CustomersAtRisk() {
 
       {err && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
-      {/* Plain stat tiles that double as filters — simple to scan at a
-          glance, no extra chart/meter to interpret. */}
-      <div className="grid sm:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => setFilter('all')}
-          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'all' ? 'ring-2 ring-[var(--primary)]' : ''}`}
-        >
-          <div className="text-xs text-mute uppercase">Total at risk</div>
-          <div className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{total}</div>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('critical')}
-          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'critical' ? 'ring-2 ring-red-500' : ''}`}
-        >
-          <div className="text-xs text-mute uppercase">Critical</div>
-          <div className="mt-1 text-2xl font-semibold text-red-400">{criticalCount}</div>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('warning')}
-          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'warning' ? 'ring-2 ring-amber-500' : ''}`}
-        >
-          <div className="text-xs text-mute uppercase">Warning</div>
-          <div className="mt-1 text-2xl font-semibold text-amber-400">{warningCount}</div>
-        </button>
-        <div className="form-card">
-          <div className="text-xs text-mute uppercase">MRR at risk</div>
-          <div className="mt-1 text-2xl font-semibold text-[var(--accent)]">{fmtUSD(mrrAtRisk)}</div>
+      {/* Underline tabs instead of boxed KPI tiles — a simpler, single-line
+          way to both see counts and switch the filter. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap border-b border-[var(--border)]">
+        <div className="flex items-center gap-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setFilter(t.key)}
+              className={`relative px-3 py-2.5 text-sm font-semibold transition-colors ${
+                filter === t.key ? 'text-[var(--foreground)]' : 'text-mute hover:text-[var(--foreground)]'
+              }`}
+            >
+              {t.label} <span className="text-xs text-mute">({t.count})</span>
+              {filter === t.key && (
+                <span className={`absolute left-0 right-0 -bottom-px h-0.5 rounded-full ${
+                  t.key === 'critical' ? 'bg-red-500' : t.key === 'warning' ? 'bg-amber-500' : 'bg-[var(--primary)]'
+                }`} />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 text-sm pb-2.5 text-[var(--body)]">
+          <DollarSign className="w-4 h-4" /> <span className="font-semibold text-[var(--foreground)]">{fmtUSD(mrrAtRisk)}</span> at risk
         </div>
       </div>
 
-      <div className="form-card p-0 overflow-x-auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Customer</th>
-              <th>Risk signals</th>
-              <th>Usage</th>
-              <th>Plan</th>
-              <th className="text-right">MRR</th>
-              <th>Signed up</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows === null && <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>}
-            {filteredRows?.length === 0 && (
-              <tr><td colSpan={6} className="text-center text-mute py-10">
-                {total === 0
-                  ? '✓ No customers currently flagged — everyone is provisioned, within their plan, and active.'
-                  : 'No customers match this filter.'}
-              </td></tr>
-            )}
-            {(filteredRows || []).map(({ user: u, risk }, i) => (
-              <tr
-                key={u.id}
-                className="group relative transition-colors hover:bg-white/[0.035] animate-fade-up"
-                style={{
-                  animationDelay: `${Math.min(i, 8) * 40}ms`,
-                  boxShadow: `inset 3px 0 0 0 ${risk.severity === 'critical' ? 'rgba(248,113,113,0.7)' : 'rgba(251,191,36,0.7)'}`,
-                }}
-              >
-                <td>
-                  <div className="flex items-center gap-2.5">
-                    <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-[11px] font-bold">
-                      {initials(u.company || u.name)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{u.company || u.name}</div>
-                      <div className="text-xs text-mute truncate">{u.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1.5 max-w-xs">
-                    {risk.reasons.map((id) => <ReasonPill key={id} id={id} />)}
-                  </div>
-                </td>
-                <td>
-                  {risk.totalMin > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <UsageBar pct={risk.usagePct} />
-                      <span className="text-xs text-mute whitespace-nowrap">
-                        {risk.usedMin.toFixed(1)} / {risk.totalMin} min
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-mute text-xs italic">no plan minutes</span>
-                  )}
-                </td>
-                <td className="text-sm">
-                  {risk.dids.length > 0
-                    ? risk.dids.map((d) => d.plan?.label).filter(Boolean).join(', ') || '—'
-                    : <span className="text-mute italic">none</span>}
-                </td>
-                <td className="text-right font-semibold text-[var(--accent)] transition-transform group-hover:scale-105 origin-right">{fmtUSD(risk.mrr)}</td>
-                <td className="text-xs text-mute whitespace-nowrap"><Calendar className="w-3 h-3 inline-block mr-1 -mt-0.5" />{fmtDate(u.createdAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {filteredRows === null && <div className="form-card text-center text-mute py-10">Loading…</div>}
+      {filteredRows?.length === 0 && (
+        <div className="form-card text-center text-mute py-10">
+          {total === 0
+            ? '✓ No customers currently flagged — everyone is provisioned, within their plan, and active.'
+            : 'No customers match this filter.'}
+        </div>
+      )}
+      {filteredRows && filteredRows.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {filteredRows.map((r) => (
+            <RiskRow
+              key={r.user.id}
+              user={r.user}
+              risk={r.risk}
+              expanded={expandedId === r.user.id}
+              onToggle={() => setExpandedId((cur) => (cur === r.user.id ? null : r.user.id))}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
