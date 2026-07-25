@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Phone, MapPin, Users as UsersIcon, GitBranch } from 'lucide-react';
+import { Building2, Phone, MapPin, Users as UsersIcon } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -53,36 +53,23 @@ function CustomerBadge({ r, onDrill }) {
 }
 
 // A "hub" card for a reseller — gradient accent strip, glowing avatar ring,
-// and stat chips. Sub-resellers render as their own hub card with a small
-// "Under <parent>" line instead of being nested inside their parent's card.
+// and stat chips.
 function ResellerHub({ r, onDrill }) {
-  const isSub = r.userType === 'sub-reseller';
   return (
     <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--popover)] overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-      <div className={`h-1.5 ${isSub ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : BRAND_GRADIENT}`} aria-hidden="true" />
+      <div className={`h-1.5 ${BRAND_GRADIENT}`} aria-hidden="true" />
       <div className="p-5 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`shrink-0 w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/10 shadow-[0_0_20px_var(--glow)] ${
-              isSub ? 'bg-gradient-to-br from-purple-500 to-indigo-500' : 'bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]'
-            }`}>
+            <span className="shrink-0 w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/10 shadow-[0_0_20px_var(--glow)] bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]">
               {initials(r.company || r.name)}
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-base font-bold text-[var(--foreground)] truncate">{r.company || r.name}</span>
-                <span className={`pill text-[9px] uppercase tracking-wider font-semibold ${
-                  isSub ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'
-                }`}>
-                  {isSub ? 'sub-reseller' : 'reseller'}
-                </span>
+                <span className="pill bg-amber-500/15 text-amber-400 text-[9px] uppercase tracking-wider font-semibold">reseller</span>
               </div>
               <div className="text-xs text-mute truncate">{r.email} · @{r.username}</div>
-              {r.parent && (
-                <div className="text-[11px] text-mute flex items-center gap-1 mt-0.5">
-                  <GitBranch className="w-3 h-3" /> Under {r.parent.company || r.parent.name}
-                </div>
-              )}
             </div>
           </div>
           <span className="shrink-0 text-[11px] text-mute whitespace-nowrap">Joined {fmtDate(r.createdAt)}</span>
@@ -118,16 +105,14 @@ const emptyForm = () => ({
 
 // Shown only when the real reseller list comes back genuinely empty — same
 // "never overrides real data" rule as the other admin pages' demo
-// fallbacks. Includes a sub-reseller under a parent so that relationship
-// renders too.
+// fallbacks.
 const DEMO_RESELLERS = [
   { id: 'demo-r1', company: 'Acme Voice Solutions', name: 'Jane Acme', email: 'ops@acme.com', username: 'acme', userType: 'reseller',
-    resellerPortal: 'acme.io', phone: '+91 98765 43210', customerCount: 12, kycLocation: 'Mumbai, IN', createdAt: daysAgo(120), parent: null },
+    resellerPortal: 'acme.io', phone: '+91 98765 43210', customerCount: 12, kycLocation: 'Mumbai, IN', createdAt: daysAgo(120) },
   { id: 'demo-r2', company: 'BrightLine Comms', name: 'Marcus Lee', email: 'hello@brightline.io', username: 'brightline', userType: 'reseller',
-    resellerPortal: 'brightline.io', phone: '+1 415 555 0199', customerCount: 5, kycLocation: 'Austin, US', createdAt: daysAgo(60), parent: null },
-  { id: 'demo-r3', company: 'Acme APAC', name: 'Wei Tan', email: 'wei@acme-apac.io', username: 'acme-apac', userType: 'sub-reseller',
-    resellerPortal: 'acme-apac.io', phone: '+65 8123 4567', customerCount: 3, kycLocation: 'Singapore, SG', createdAt: daysAgo(30),
-    parent: { company: 'Acme Voice Solutions', resellerPortal: 'acme.io' } },
+    resellerPortal: 'brightline.io', phone: '+1 415 555 0199', customerCount: 5, kycLocation: 'Austin, US', createdAt: daysAgo(60) },
+  { id: 'demo-r3', company: 'Acme APAC', name: 'Wei Tan', email: 'wei@acme-apac.io', username: 'acme-apac', userType: 'reseller',
+    resellerPortal: 'acme-apac.io', phone: '+65 8123 4567', customerCount: 3, kycLocation: 'Singapore, SG', createdAt: daysAgo(30) },
 ];
 
 // Demo customers shown when drilling into a demo reseller — keyed by the
