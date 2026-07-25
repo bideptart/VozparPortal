@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Calendar } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -35,6 +35,9 @@ const monthlyFor = (did) => {
 };
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
+const initials = (name) => (name || '?')
+  .split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 
 // Shown only when the real customer list comes back genuinely empty — same
 // "never overrides real data" rule as the other admin pages' demo
@@ -100,8 +103,10 @@ function ReasonPill({ id }) {
   const r = REASONS[id];
   if (!r) return null;
   const cls = r.severity === 'critical' ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400';
+  const dot = r.severity === 'critical' ? 'bg-red-400' : 'bg-amber-400';
   return (
-    <span className={`pill text-[10px] uppercase tracking-wider font-semibold ${cls}`} title={r.hint}>
+    <span className={`pill text-[10px] uppercase tracking-wider font-semibold inline-flex items-center gap-1.5 ${cls}`} title={r.hint}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
       {r.label}
     </span>
   );
@@ -185,7 +190,7 @@ export default function CustomersAtRisk() {
         <button
           type="button"
           onClick={() => setFilter('all')}
-          className={`form-card text-left transition ${filter === 'all' ? 'ring-2 ring-[var(--primary)]' : ''}`}
+          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'all' ? 'ring-2 ring-[var(--primary)]' : ''}`}
         >
           <div className="text-xs text-mute uppercase">Total at risk</div>
           <div className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{total}</div>
@@ -193,7 +198,7 @@ export default function CustomersAtRisk() {
         <button
           type="button"
           onClick={() => setFilter('critical')}
-          className={`form-card text-left transition ${filter === 'critical' ? 'ring-2 ring-red-500' : ''}`}
+          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'critical' ? 'ring-2 ring-red-500' : ''}`}
         >
           <div className="text-xs text-mute uppercase">Critical</div>
           <div className="mt-1 text-2xl font-semibold text-red-400">{criticalCount}</div>
@@ -201,7 +206,7 @@ export default function CustomersAtRisk() {
         <button
           type="button"
           onClick={() => setFilter('warning')}
-          className={`form-card text-left transition ${filter === 'warning' ? 'ring-2 ring-amber-500' : ''}`}
+          className={`form-card text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] ${filter === 'warning' ? 'ring-2 ring-amber-500' : ''}`}
         >
           <div className="text-xs text-mute uppercase">Warning</div>
           <div className="mt-1 text-2xl font-semibold text-amber-400">{warningCount}</div>
@@ -233,11 +238,25 @@ export default function CustomersAtRisk() {
                   : 'No customers match this filter.'}
               </td></tr>
             )}
-            {(filteredRows || []).map(({ user: u, risk }) => (
-              <tr key={u.id}>
+            {(filteredRows || []).map(({ user: u, risk }, i) => (
+              <tr
+                key={u.id}
+                className="group relative transition-colors hover:bg-white/[0.035] animate-fade-up"
+                style={{
+                  animationDelay: `${Math.min(i, 8) * 40}ms`,
+                  boxShadow: `inset 3px 0 0 0 ${risk.severity === 'critical' ? 'rgba(248,113,113,0.7)' : 'rgba(251,191,36,0.7)'}`,
+                }}
+              >
                 <td>
-                  <div className="font-medium">{u.company || u.name}</div>
-                  <div className="text-xs text-mute">{u.email}</div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-[11px] font-bold">
+                      {initials(u.company || u.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{u.company || u.name}</div>
+                      <div className="text-xs text-mute truncate">{u.email}</div>
+                    </div>
+                  </div>
                 </td>
                 <td>
                   <div className="flex flex-wrap gap-1.5 max-w-xs">
@@ -261,8 +280,8 @@ export default function CustomersAtRisk() {
                     ? risk.dids.map((d) => d.plan?.label).filter(Boolean).join(', ') || '—'
                     : <span className="text-mute italic">none</span>}
                 </td>
-                <td className="text-right font-semibold text-[var(--accent)]">{fmtUSD(risk.mrr)}</td>
-                <td className="text-xs text-mute">{fmtDate(u.createdAt)}</td>
+                <td className="text-right font-semibold text-[var(--accent)] transition-transform group-hover:scale-105 origin-right">{fmtUSD(risk.mrr)}</td>
+                <td className="text-xs text-mute whitespace-nowrap"><Calendar className="w-3 h-3 inline-block mr-1 -mt-0.5" />{fmtDate(u.createdAt)}</td>
               </tr>
             ))}
           </tbody>
