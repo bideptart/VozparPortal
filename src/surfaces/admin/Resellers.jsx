@@ -18,19 +18,6 @@ const initials = (name) => (name || '?')
 
 const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
 
-// Groups the flat reseller list into top-level roots with their
-// sub-resellers nested beneath, keyed by matching portal slug.
-function groupByParent(list) {
-  const roots = list.filter((r) => !r.parent);
-  // A sub-reseller whose parent isn't in this list (e.g. parent filtered
-  // out elsewhere) is shown as its own root rather than dropped.
-  const orphans = list.filter((r) => r.parent && !roots.some((p) => p.resellerPortal === r.parent.resellerPortal));
-  return [...roots, ...orphans].map((root) => ({
-    root,
-    children: list.filter((r) => r.parent && r.parent.resellerPortal === root.resellerPortal),
-  }));
-}
-
 function StatTile({ icon, label, value }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] px-4 py-3 flex items-center gap-3">
@@ -60,77 +47,58 @@ function CustomerBadge({ r, onDrill, disabled }) {
   );
 }
 
-// A "hub" card for a top-level reseller — gradient accent strip, glowing
-// avatar ring, stat chips, and (if any) sub-resellers rendered as smaller
-// satellite chips orbiting off the bottom edge.
-function ResellerHub({ root, children, onDrill, isDemoRow }) {
+// A "hub" card for a reseller — gradient accent strip, glowing avatar ring,
+// and stat chips. Sub-resellers render as their own hub card with a small
+// "Under <parent>" line instead of being nested inside their parent's card.
+function ResellerHub({ r, onDrill, isDemoRow }) {
+  const isSub = r.userType === 'sub-reseller';
   return (
     <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--popover)] overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-      <div className={`h-1.5 ${BRAND_GRADIENT}`} aria-hidden="true" />
+      <div className={`h-1.5 ${isSub ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : BRAND_GRADIENT}`} aria-hidden="true" />
       <div className="p-5 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 w-14 h-14 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/10 shadow-[0_0_20px_var(--glow)]">
-              {initials(root.company || root.name)}
+            <span className={`shrink-0 w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/10 shadow-[0_0_20px_var(--glow)] ${
+              isSub ? 'bg-gradient-to-br from-purple-500 to-indigo-500' : 'bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]'
+            }`}>
+              {initials(r.company || r.name)}
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-base font-bold text-[var(--foreground)] truncate">{root.company || root.name}</span>
-                <span className="pill bg-amber-500/15 text-amber-400 text-[9px] uppercase tracking-wider font-semibold">reseller</span>
+                <span className="text-base font-bold text-[var(--foreground)] truncate">{r.company || r.name}</span>
+                <span className={`pill text-[9px] uppercase tracking-wider font-semibold ${
+                  isSub ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'
+                }`}>
+                  {isSub ? 'sub-reseller' : 'reseller'}
+                </span>
               </div>
-              <div className="text-xs text-mute truncate">{root.email} · @{root.username}</div>
+              <div className="text-xs text-mute truncate">{r.email} · @{r.username}</div>
+              {r.parent && (
+                <div className="text-[11px] text-mute flex items-center gap-1 mt-0.5">
+                  <GitBranch className="w-3 h-3" /> Under {r.parent.company || r.parent.name}
+                </div>
+              )}
             </div>
           </div>
-          <span className="shrink-0 text-[11px] text-mute whitespace-nowrap">Joined {fmtDate(root.createdAt)}</span>
+          <span className="shrink-0 text-[11px] text-mute whitespace-nowrap">Joined {fmtDate(r.createdAt)}</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg bg-black/20 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wider text-mute flex items-center gap-1"><Building2 className="w-3 h-3" /> Portal</div>
-            <div className="font-mono text-lime-400 text-sm truncate">{root.resellerPortal || '—'}</div>
+            <div className="font-mono text-lime-400 text-sm truncate">{r.resellerPortal || '—'}</div>
           </div>
           <div className="rounded-lg bg-black/20 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wider text-mute flex items-center gap-1"><Phone className="w-3 h-3" /> Phone</div>
-            <div className="text-[var(--foreground)] text-sm truncate">{root.phone || '—'}</div>
+            <div className="text-[var(--foreground)] text-sm truncate">{r.phone || '—'}</div>
           </div>
           <div className="rounded-lg bg-black/20 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wider text-mute flex items-center gap-1"><MapPin className="w-3 h-3" /> KYC</div>
-            <div className="text-[var(--foreground)] text-sm truncate">{root.kycLocation || '—'}</div>
+            <div className="text-[var(--foreground)] text-sm truncate">{r.kycLocation || '—'}</div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <CustomerBadge r={root} onDrill={onDrill} disabled={isDemoRow(root.id)} />
-          {children.length > 0 && (
-            <span className="text-[11px] text-mute flex items-center gap-1">
-              <GitBranch className="w-3 h-3" /> {children.length} sub-reseller{children.length > 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-
-        {children.length > 0 && (
-          <div className="relative pt-3 -mx-1 px-1 border-t border-dashed border-[var(--border)]">
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {children.map((c) => (
-                <div key={c.id} className="shrink-0 w-56 rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                      {initials(c.company || c.name)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-[var(--foreground)] truncate">{c.company || c.name}</div>
-                      <div className="text-[10px] text-mute truncate">{c.email}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-mute">
-                    <span className="font-mono text-lime-400 truncate">{c.resellerPortal}</span>
-                  </div>
-                  <CustomerBadge r={c} onDrill={onDrill} disabled={isDemoRow(c.id)} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <CustomerBadge r={r} onDrill={onDrill} disabled={isDemoRow(r.id)} />
       </div>
     </div>
   );
@@ -357,8 +325,8 @@ export default function Resellers() {
           </div>
 
           <div className="grid xl:grid-cols-2 gap-4">
-            {groupByParent(effectiveList).map(({ root, children }) => (
-              <ResellerHub key={root.id} root={root} children={children} onDrill={setDrilledReseller} isDemoRow={isDemoRow} />
+            {effectiveList.map((r) => (
+              <ResellerHub key={r.id} r={r} onDrill={setDrilledReseller} isDemoRow={isDemoRow} />
             ))}
           </div>
         </>
