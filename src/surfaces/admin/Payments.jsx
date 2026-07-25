@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DollarSign, Repeat2, TrendingUp, Clock, RefreshCw, ArrowUpRight } from 'lucide-react';
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -138,6 +138,17 @@ function DurationToggle({ value, onChange }) {
 // days that mostly have $0, which is misleading.
 function NewMrrChart({ data, days, onDaysChange }) {
   const total = useMemo(() => data.reduce((a, d) => a + d.amount, 0), [data]);
+  const scrollRef = useRef(null);
+
+  // The most recent days (where the actual activity is) render at the
+  // right edge, but a wide 30d/90d chart opens scrolled to the left —
+  // showing a screen of empty $0 bars unless the admin manually scrolls.
+  // Jump to the right edge whenever the duration/data changes so the
+  // meaningful bars are visible immediately.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [data]);
 
   return (
     <Card className="flex-1 min-w-[300px]">
@@ -154,7 +165,7 @@ function NewMrrChart({ data, days, onDaysChange }) {
             card so no scrollbar shows (same look as before), but 14d/30d/90d
             overflow into a horizontal scroll instead of the bars getting
             crushed unreadably thin. */}
-        <div className="overflow-x-auto">
+        <div ref={scrollRef} className="overflow-x-auto">
           <div style={{ width: '100%', minWidth: Math.max(data.length * 40, 260), height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="30%">
