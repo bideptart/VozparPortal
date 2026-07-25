@@ -65,7 +65,7 @@ function UsageBar({ used, total }) {
 function CustomerCard({ c, busyId, onProvision, onDelete, isDemo }) {
   const isLive = !!c.number;
   return (
-    <div className="form-card flex flex-col gap-3">
+    <div className="form-card flex flex-col gap-3 cursor-pointer transition-transform duration-150 ease-out active:scale-[0.97] hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <span className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-sm font-bold">
