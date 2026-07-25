@@ -109,7 +109,7 @@ export default function Templates() {
 
   return (
     <div>
-      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm text-lime-700 hover:underline">
+      <Link to={`${basePath}/agents`} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] hover:underline">
         <ArrowLeft size={14} /> All agents
       </Link>
 
