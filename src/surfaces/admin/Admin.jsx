@@ -233,7 +233,7 @@ export default function Admin() {
               One badge + one <h1>, always rendered (no breakpoint toggling
               between two icon variants) so the icon is never conditionally
               missing at any width. */}
-          <div className="lg:flex-1 flex items-center gap-2 lg:gap-2.5 lg:min-w-0">
+          <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-2.5">
             {ActiveIcon && (
               <span className="flex w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
                 <ActiveIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />

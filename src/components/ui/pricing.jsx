@@ -307,7 +307,7 @@ export default function PricingSection({ onSelectPlan }) {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-        <Card className="rounded-[24px] border-[var(--border)] bg-[var(--card)]">
+        <Card className="min-w-0 rounded-[24px] border-[var(--border)] bg-[var(--card)]">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
               <Tag size={14} />
