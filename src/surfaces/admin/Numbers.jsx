@@ -173,7 +173,6 @@ export default function Numbers() {
     <div>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">☎ Numbers inventory</h1>
           <p className="text-mute text-sm mt-1">
             Every DID available to the platform — assigned (busy) or unassigned (free).
             Add new DIDs as you receive them from the carrier.
