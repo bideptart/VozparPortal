@@ -5,6 +5,8 @@ import { AtSign, Building2, Lock, Mail, Phone, Save, ShieldCheck, User } from "l
 import { useApp } from "../../AppContext.jsx";
 import AccountDialog from "@/components/ui/ruixen-dialog";
 
+const BRAND_GRADIENT = "bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]";
+
 const initialsOf = (name) => {
   if (!name) return "NA";
   return String(name)
@@ -237,9 +239,14 @@ export default function Account() {
               </div>
             )}
 
-            <button type="submit" className="btn-primary flex w-full items-center justify-center gap-2 py-2.5 text-sm" disabled={pwBusy}>
-              <Save size={14} />
-              {pwBusy ? "Updating..." : "Update Password"}
+            <button
+              type="submit"
+              disabled={pwBusy}
+              className="group relative overflow-hidden flex w-full items-center justify-center gap-2 py-2.5 text-sm font-medium text-white rounded-full border border-white/25 transition duration-200 ease-out hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+              <Save size={14} className="relative" />
+              <span className="relative">{pwBusy ? "Updating..." : "Update Password"}</span>
             </button>
           </form>
         </aside>
