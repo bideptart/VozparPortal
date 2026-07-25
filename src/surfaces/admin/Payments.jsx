@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DollarSign, Repeat2, TrendingUp, Clock, RefreshCw } from 'lucide-react';
+import { DollarSign, Repeat2, TrendingUp, Clock, RefreshCw, ArrowUpRight } from 'lucide-react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card.jsx';
 import { api } from '../../api.js';
@@ -96,32 +97,108 @@ const CHART_COLORS = {
   legend: '#CCD6DF',
 };
 
-function RevenueChart({ data, title, dataKey, lineColor, legendName }) {
+function ChartStat({ label, value, valueClassName }) {
+  return (
+    <div className="text-right">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--body)]">{label}</div>
+      <div className={`text-lg font-bold ${valueClassName || ''}`}>{value}</div>
+    </div>
+  );
+}
+
+// Discrete per-day totals — a bar per day is the honest representation.
+// A smoothed line here would visually imply a continuous trend between
+// days that mostly have $0, which is misleading.
+function NewMrrChart({ data }) {
+  const total = useMemo(() => data.reduce((a, d) => a + d.amount, 0), [data]);
+
   return (
     <Card className="flex-1 min-w-[300px]">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <CardTitle className="text-base font-semibold">New MRR — last 14 days</CardTitle>
+        <ChartStat label="Total added" value={fmtCurrency(total)} valueClassName="text-[var(--primary)]" />
       </CardHeader>
       <CardContent>
-        <div style={{ width: '100%', height: 280 }}>
+        <div style={{ width: '100%', height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-              <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tick={{ fontSize: 10 }} />
-              <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickFormatter={(v) => `$${v}`} />
+            <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="30%">
+              <defs>
+                <linearGradient id="newMrrBar" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0086F9" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#046BD2" stopOpacity={0.75} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
+              <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={44} />
               <RechartsTooltip
-                contentStyle={{
-                  backgroundColor: CHART_COLORS.tooltipBg,
-                  borderColor: CHART_COLORS.tooltipBorder,
-                  borderRadius: '0.5rem',
-                }}
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                contentStyle={{ backgroundColor: CHART_COLORS.tooltipBg, borderColor: CHART_COLORS.tooltipBorder, borderRadius: '0.5rem' }}
                 itemStyle={{ color: CHART_COLORS.tooltipText }}
                 labelStyle={{ color: CHART_COLORS.legend }}
-                formatter={(value) => [fmtCurrency(value), legendName]}
+                formatter={(value) => [fmtCurrency(value), 'New MRR']}
               />
-              <Legend wrapperStyle={{ color: CHART_COLORS.legend, fontSize: 12 }} />
-              <Line type="monotone" dataKey={dataKey} stroke={lineColor} strokeWidth={2} dot={false} name={legendName} />
-            </LineChart>
+              <Bar dataKey="amount" fill="url(#newMrrBar)" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Cumulative growth is genuinely continuous (a running total), so a
+// smoothed area fill is the right chart here — unlike the bar chart above.
+function CumulativeMrrChart({ data }) {
+  const first = data[0]?.total ?? 0;
+  const last = data[data.length - 1]?.total ?? 0;
+  const growthPct = first > 0 ? ((last - first) / first) * 100 : (last > 0 ? 100 : 0);
+
+  return (
+    <Card className="flex-1 min-w-[300px]">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <CardTitle className="text-base font-semibold">Cumulative MRR growth</CardTitle>
+        <ChartStat
+          label="Current total"
+          value={fmtCurrency(last)}
+          valueClassName="text-[#22D3EE] flex items-center gap-1 justify-end"
+        />
+      </CardHeader>
+      <CardContent>
+        {data.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold -mt-2 mb-2 justify-end">
+            <ArrowUpRight className="w-3.5 h-3.5" /> {growthPct >= 0 ? '+' : ''}{growthPct.toFixed(0)}% over period
+          </div>
+        )}
+        <div style={{ width: '100%', height: growthPct !== 0 ? 232 : 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="cumulativeFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22D3EE" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="#22D3EE" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
+              <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={44} />
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: CHART_COLORS.tooltipBg, borderColor: CHART_COLORS.tooltipBorder, borderRadius: '0.5rem' }}
+                itemStyle={{ color: CHART_COLORS.tooltipText }}
+                labelStyle={{ color: CHART_COLORS.legend }}
+                formatter={(value) => [fmtCurrency(value), 'Cumulative MRR']}
+              />
+              <Area
+                type="monotone"
+                dataKey="total"
+                stroke="#22D3EE"
+                strokeWidth={2.5}
+                fill="url(#cumulativeFill)"
+                dot={false}
+                isAnimationActive={false}
+                activeDot={{ r: 5, fill: '#22D3EE', stroke: CHART_COLORS.tooltipBg, strokeWidth: 2 }}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
@@ -296,20 +373,8 @@ export default function Payments() {
 
       {/* Charts */}
       <div className="flex flex-wrap gap-4">
-        <RevenueChart
-          data={dailyData}
-          title="New MRR — last 14 days"
-          dataKey="amount"
-          lineColor="#046BD2"
-          legendName="New MRR"
-        />
-        <RevenueChart
-          data={cumulativeData}
-          title="Cumulative MRR growth"
-          dataKey="total"
-          lineColor="#22D3EE"
-          legendName="Cumulative MRR"
-        />
+        <NewMrrChart data={dailyData} />
+        <CumulativeMrrChart data={cumulativeData} />
       </div>
 
       {/* Recent activity */}
