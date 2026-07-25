@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 
+const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const now = Date.now();
 
@@ -215,18 +217,20 @@ export default function Transactions() {
           <button
             type="button"
             onClick={exportCsv}
-            className="btn-ghost text-sm inline-flex items-center gap-2"
+            className="group relative overflow-hidden text-sm inline-flex items-center gap-2 px-[22px] py-[11px] rounded-full border border-[var(--border)] text-[var(--foreground)] transition-all duration-200 ease-out hover:scale-105 hover:shadow-lg hover:text-white active:scale-95 active:text-white"
           >
-            <Download size={15} />
-            Export CSV
+            <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+            <Download size={15} className="relative" />
+            <span className="relative">Export CSV</span>
           </button>
           <button
             type="button"
             onClick={resetFilters}
-            className="btn-ghost text-sm inline-flex items-center gap-2"
+            className="group relative overflow-hidden text-sm inline-flex items-center gap-2 px-[22px] py-[11px] rounded-full border border-[var(--border)] text-[var(--foreground)] transition-all duration-200 ease-out hover:scale-105 hover:shadow-lg hover:text-white active:scale-95 active:text-white"
           >
-            <RefreshCw size={15} />
-            Refresh
+            <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+            <RefreshCw size={15} className="relative" />
+            <span className="relative">Refresh</span>
           </button>
         </div>
       </div>
