@@ -84,8 +84,6 @@ const COMPARISON_ROWS = [
   { label: 'AI agents', values: ['1', '3', '10'] },
   { label: 'Knowledge base', values: ['Basic', 'Advanced', 'Advanced'] },
   { label: 'Analytics', values: ['Core', 'Advanced', 'Full suite'] },
-  { label: 'API access', values: ['-', '-', 'Included'] },
-  { label: 'Custom integrations', values: ['-', '-', 'Included'] },
   { label: 'Support', values: ['Email', 'Priority', '24/7'] },
 ];
 
@@ -278,27 +276,6 @@ export default function PricingSection() {
                 </CardHeader>
 
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.03)] p-3">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--body)]">Minutes</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--foreground)]">
-                        <NumberFlow value={plan.minutes} />
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.03)] p-3">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--body)]">Numbers</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--foreground)]">
-                        <NumberFlow value={plan.numbers} />
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.03)] p-3">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--body)]">Agents</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--foreground)]">
-                        <NumberFlow value={plan.agents} />
-                      </div>
-                    </div>
-                  </div>
-
                   <ul className="space-y-3">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-[var(--body)]">
@@ -309,13 +286,6 @@ export default function PricingSection() {
                       </li>
                     ))}
                   </ul>
-
-                  <div className="rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[var(--body)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--body)]">
-                      Support
-                    </div>
-                    <div className="mt-2 text-[var(--foreground)]">{plan.responseTime}</div>
-                  </div>
 
                   <button
                     type="button"

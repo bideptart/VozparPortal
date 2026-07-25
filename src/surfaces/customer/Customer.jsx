@@ -5,16 +5,13 @@ import {
   FileText, CreditCard, Receipt, User, Menu, Wrench, Ticket, DoorOpen, Tag,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
-// AddNumberModal is used directly by this file's own "+ Add plan / number"
-// button on every tab, so Numbers.jsx is loaded eagerly either way — no
-// point lazy-wrapping its default export too.
 import Logo from '../../components/Logo.jsx';
 import Footer from '../../components/Footer.jsx';
 import BookingIcon from '../../components/BookingIcon.jsx';
 
 // Lazy load Numbers to avoid crashing on API failures in demo mode
 const NumbersLazy = lazy(() => import('./Numbers.jsx'));
-const AddNumberModalLazy = lazy(() => import('./Numbers.jsx').then(m => ({ default: m.AddNumberModal })));
+const PricingModalLazy = lazy(() => import('../../components/ui/pricing-modal.jsx'));
 
 // Every tab body is its own chunk — a visitor on Overview never downloads
 // Billing/Templates/Playground code, and vice versa.
@@ -93,7 +90,7 @@ export default function Customer() {
   const { tab } = useParams();
   const [navOpen, setNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
-  const [showAddPlan, setShowAddPlan] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const callActivityActive = tab === CALL_ACTIVITY.id || CALL_ACTIVITY_CHILDREN.some((t) => t.id === tab);
   const [callActivityOpen, setCallActivityOpen] = useState(callActivityActive);
 
@@ -268,7 +265,7 @@ export default function Customer() {
             </h1>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowAddPlan(true)}>+ Add plan / number</button>
+            <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowPricingModal(true)}>+ Add plan / number</button>
           </div>
           <div className="absolute left-0 bottom-0 h-[3px] bg-[var(--primary)] transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
         </div>
@@ -286,13 +283,12 @@ export default function Customer() {
         </div>
       </div>
 
-      {showAddPlan && (
+      {showPricingModal && (
         <Suspense fallback={null}>
-          <AddNumberModalLazy
-          currentUser={user}
-          onClose={() => setShowAddPlan(false)}
-          onAdded={() => setShowAddPlan(false)}
-        />
+          <PricingModalLazy
+            open={showPricingModal}
+            onClose={() => setShowPricingModal(false)}
+          />
         </Suspense>
       )}
     </div>
