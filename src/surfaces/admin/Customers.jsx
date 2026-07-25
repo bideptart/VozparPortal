@@ -62,7 +62,7 @@ function UsageBar({ used, total }) {
 // than fit comfortably in a table (type, portal, phone, plan, Twilio SID,
 // usage, status, joined, actions), and a card lets usage render as an
 // actual bar instead of a bare "x / y" number pair.
-function CustomerCard({ c, busyId, onProvision, onDelete }) {
+function CustomerCard({ c, busyId, onProvision, onDelete, isDemo }) {
   const isLive = !!c.number;
   return (
     <div className="form-card flex flex-col gap-3">
@@ -101,18 +101,19 @@ function CustomerCard({ c, busyId, onProvision, onDelete }) {
         <div className="flex gap-1.5 shrink-0">
           {c.number && (
             <button
-              className="btn-ghost text-xs inline-flex items-center gap-1"
-              disabled={busyId === c.id + ':prov'}
+              className="btn-ghost text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={isDemo || busyId === c.id + ':prov'}
               onClick={() => onProvision(c)}
-              title="Recreate inbound trunk + dispatch rule + voice agent"
+              title={isDemo ? 'Demo data — not a real account, nothing to provision' : 'Recreate inbound trunk + dispatch rule + voice agent'}
             >
               <Wrench className="w-3 h-3" /> {busyId === c.id + ':prov' ? '…' : 'Provision'}
             </button>
           )}
           <button
-            className="btn-red text-xs inline-flex items-center gap-1"
-            disabled={busyId === c.id}
+            className="btn-red text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={isDemo || busyId === c.id}
             onClick={() => onDelete(c)}
+            title={isDemo ? 'Demo data — not a real account, nothing to delete' : undefined}
           >
             <Trash2 className="w-3 h-3" /> {busyId === c.id ? '…' : 'Delete'}
           </button>
@@ -200,7 +201,7 @@ export default function Customers() {
       {effectiveUsers && effectiveUsers.length > 0 && (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {effectiveUsers.map((c) => (
-            <CustomerCard key={c.id} c={c} busyId={busyId} onProvision={provision} onDelete={remove} />
+            <CustomerCard key={c.id} c={c} busyId={busyId} onProvision={provision} onDelete={remove} isDemo={isDemoRow(c.id)} />
           ))}
         </div>
       )}
