@@ -166,14 +166,14 @@ export default function Admin() {
       {navOpen && <div className="mobile-nav-backdrop" onClick={() => setNavOpen(false)} />}
 
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
-        <div className="h-16 flex items-center gap-1.5 px-3 bg-white sticky top-0 z-30">
+        <div className="h-16 flex items-center gap-1.5 px-3 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]">
           <Link to="/admin/overview" className="flex items-center gap-2 min-w-0" aria-label="kallus.io home">
             <Logo size={40} showWordmark={false} />
           </Link>
           {isAdminTier && (
             <button
               type="button"
-              className="hidden lg:inline-flex ml-auto shrink-0 w-6 h-6 items-center justify-center rounded-md text-mute hover:bg-slate-100 hover:text-slate-900 text-xs"
+              className="hidden lg:inline-flex ml-auto shrink-0 w-6 h-6 items-center justify-center rounded-md text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] text-xs"
               onClick={() => setNavCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
@@ -183,12 +183,12 @@ export default function Admin() {
           )}
         </div>
         <div className="sidenav-scroll">
-          <div className="px-4 pb-3 border-t border-slate-100 pt-3">
+          <div className="px-4 pb-3 border-t border-[var(--border)] pt-3">
             {/* The role appeared twice here — a plain "ADMIN" caption above the
                 email and a pill below it. Keep the pill (it carries the actual
                 role, not a hardcoded label) and move it above the email. */}
             <span className="pill pill-teal inline-block">{currentUser?.role || 'Admin'}</span>
-            <div className="text-sm font-semibold text-slate-900 mt-2 break-all">{currentUser?.email || ''}</div>
+            <div className="text-sm font-semibold text-[var(--foreground)] mt-2 break-all">{currentUser?.email || ''}</div>
           </div>
           <div className="sidenav-section">Manage</div>
           <Side list={NAV_TABS_PRIMARY} />
@@ -196,7 +196,7 @@ export default function Admin() {
           <div className="sidenav-section">Platform</div>
           <Side list={NAV_TABS_SECONDARY} />
 
-          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="mt-2 pt-2 border-t border-[var(--border)]">
             <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
               <DoorOpen size={16} strokeWidth={2} /> Log out
             </button>
@@ -209,7 +209,7 @@ export default function Admin() {
             the divider line under the sidebar logo continues across the
             entire page width. No user-avatar widget here anymore — Sign Out
             isn't reachable from the UI (see Customer.jsx for the same note). */}
-        <div className="relative sticky top-0 z-30 bg-white -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-slate-200 mb-6">
+        <div className="relative sticky top-0 z-30 bg-[var(--popover)] -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-[var(--border)] mb-6">
           <button
             className="mobile-nav-toggle lg:hidden"
             onClick={() => setNavOpen(true)}
@@ -240,7 +240,7 @@ export default function Admin() {
                 <ActiveIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />
               </span>
             )}
-            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-slate-900 lg:dark:text-slate-100 truncate">
+            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-[var(--foreground)] truncate">
               {activeLabel}
             </h1>
           </div>
