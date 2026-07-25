@@ -33,14 +33,13 @@ function StatTile({ icon, label, value }) {
   );
 }
 
-function CustomerBadge({ r, onDrill, disabled }) {
+function CustomerBadge({ r, onDrill }) {
   if (!r.customerCount) return <span className="pill bg-slate-500/15 text-mute text-xs">0 customers</span>;
   return (
     <button
       onClick={() => onDrill(r)}
-      disabled={disabled}
-      className="pill bg-lime-500/10 text-lime-400 hover:bg-lime-500/20 hover:shadow-[0_0_12px_rgba(163,230,53,0.35)] transition cursor-pointer inline-flex items-center gap-1 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-      title={disabled ? 'Demo data — nothing to drill into' : 'Click to see all customers under this reseller'}
+      className="pill bg-lime-500/10 text-lime-400 hover:bg-lime-500/20 hover:shadow-[0_0_12px_rgba(163,230,53,0.35)] transition cursor-pointer inline-flex items-center gap-1 text-xs font-semibold"
+      title="Click to see all customers under this reseller"
     >
       <UsersIcon className="w-3 h-3" /> {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'} →
     </button>
@@ -50,7 +49,7 @@ function CustomerBadge({ r, onDrill, disabled }) {
 // A "hub" card for a reseller — gradient accent strip, glowing avatar ring,
 // and stat chips. Sub-resellers render as their own hub card with a small
 // "Under <parent>" line instead of being nested inside their parent's card.
-function ResellerHub({ r, onDrill, isDemoRow }) {
+function ResellerHub({ r, onDrill }) {
   const isSub = r.userType === 'sub-reseller';
   return (
     <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--popover)] overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl">
@@ -98,7 +97,7 @@ function ResellerHub({ r, onDrill, isDemoRow }) {
           </div>
         </div>
 
-        <CustomerBadge r={r} onDrill={onDrill} disabled={isDemoRow(r.id)} />
+        <CustomerBadge r={r} onDrill={onDrill} />
       </div>
     </div>
   );
@@ -124,6 +123,26 @@ const DEMO_RESELLERS = [
     resellerPortal: 'acme-apac.io', phone: '+65 8123 4567', customerCount: 3, kycLocation: 'Singapore, SG', createdAt: daysAgo(30),
     parent: { company: 'Acme Voice Solutions', resellerPortal: 'acme.io' } },
 ];
+
+// Demo customers shown when drilling into a demo reseller — keyed by the
+// demo reseller's id so the modal doesn't need a real API call.
+const makeDemoCustomer = (i, label, plan) => ({
+  id: `demo-c-${label}-${i}`,
+  company: `${label} Customer ${i}`,
+  name: `Contact ${i}`,
+  email: `contact${i}@${label.toLowerCase().replace(/\s+/g, '')}.example`,
+  phone: `+1 555 010${i}`,
+  numbers: [{ id: `demo-n-${label}-${i}`, value: `+1 415 555 0${100 + i}`, isPrimary: true, planCycle: i % 2 ? 'yearly' : 'monthly', plan }],
+  minutesUsed: 40 * i,
+  planActivated: daysAgo(30 + i * 5),
+  createdAt: daysAgo(20 + i * 5),
+});
+
+const DEMO_CUSTOMERS_BY_RESELLER = {
+  'demo-r1': [1, 2, 3].map((i) => makeDemoCustomer(i, 'Acme', { label: 'Growth', amount: 79, min: 500, rate: 0.1 })),
+  'demo-r2': [1, 2].map((i) => makeDemoCustomer(i, 'BrightLine', { label: 'Starter', amount: 29, min: 100, rate: 0.15 })),
+  'demo-r3': [1].map((i) => makeDemoCustomer(i, 'AcmeAPAC', { label: 'Scale', amount: 199, min: 1200, rate: 0.08 })),
+};
 
 // =============================================================================
 // Resellers — superadmin-only page to register whitelabel resellers (with
@@ -160,8 +179,6 @@ export default function Resellers() {
   // genuinely empty — never overrides real data.
   const usingDemo = list !== null && list.length === 0;
   const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_RESELLERS);
-  const isDemoRow = (id) => usingDemo && String(id).startsWith('demo-');
-
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e) => {
@@ -326,7 +343,7 @@ export default function Resellers() {
 
           <div className="grid xl:grid-cols-2 gap-4">
             {effectiveList.map((r) => (
-              <ResellerHub key={r.id} r={r} onDrill={setDrilledReseller} isDemoRow={isDemoRow} />
+              <ResellerHub key={r.id} r={r} onDrill={setDrilledReseller} />
             ))}
           </div>
         </>
@@ -360,6 +377,11 @@ function ResellerCustomersModal({ reseller, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
+    const demoCustomers = DEMO_CUSTOMERS_BY_RESELLER[reseller.id];
+    if (demoCustomers) {
+      setData({ customers: demoCustomers });
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
