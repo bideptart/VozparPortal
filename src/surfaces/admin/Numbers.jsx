@@ -4,6 +4,8 @@ import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
 
+const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
+
 const fmtDate = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -206,12 +208,15 @@ export default function Numbers() {
             <button
               onClick={() => setExportOpen((v) => !v)}
               disabled={exporting || !filtered.length}
-              className="btn-teal text-sm whitespace-nowrap inline-flex items-center gap-1.5 transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+              className="group relative overflow-hidden text-sm font-semibold whitespace-nowrap inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-white/25 text-white transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
             >
-              {exporting
-                ? <>Exporting…</>
-                : <><Download className="w-4 h-4" /> Export <ChevronDown className="w-3.5 h-3.5" /></>
-              }
+              <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+              <span className="relative inline-flex items-center gap-1.5">
+                {exporting
+                  ? <>Exporting…</>
+                  : <><Download className="w-4 h-4" /> Export <ChevronDown className="w-3.5 h-3.5" /></>
+                }
+              </span>
             </button>
             {exportOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-56 bg-[var(--popover)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden z-50 p-1.5 animate-modal-in">
@@ -237,9 +242,10 @@ export default function Numbers() {
           </div>
           <button
             onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
-            className="btn-teal text-sm whitespace-nowrap"
+            className="group relative overflow-hidden text-sm font-semibold whitespace-nowrap inline-flex items-center px-5 py-2.5 rounded-full border border-white/25 text-white transition duration-200 ease-out hover:scale-105 active:scale-95"
           >
-            {showForm ? '× Cancel' : '+ Add DID'}
+            <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+            <span className="relative">{showForm ? '× Cancel' : '+ Add DID'}</span>
           </button>
         </div>
       </div>
