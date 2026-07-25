@@ -876,13 +876,6 @@ p {
     font-weight: 600;
     white-space: nowrap;
   }
-  @keyframes signal-bar-grow {
-    from { transform: scaleY(0); opacity: 0; }
-    to   { transform: scaleY(1); opacity: 1; }
-  }
-  .signal-bar {
-    animation: signal-bar-grow 0.4s ease-out backwards;
-  }
   .overview-banner,
   .overview-card {
     border: 1px solid rgba(148,163,184,0.16);

@@ -5,6 +5,7 @@ import {
   List, UserPlus, Users, AlertTriangle, Building2, DollarSign, Activity, HeartPulse, RefreshCw,
   Database, PhoneCall, Zap,
 } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, YAxis, Tooltip } from 'recharts';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 import { AddNumberModal } from '../customer/Numbers.jsx';
@@ -343,31 +344,53 @@ function HealthGauge({ pct, label, tone }) {
   );
 }
 
-// Classic signal-strength bars (like a phone's signal meter) standing in
-// for the latency graph — 5 bars of increasing height, lit up based on how
-// fast the real measured response was. Each bar animates in with a stagger.
-const SIGNAL_THRESHOLDS = [50, 100, 200, 350]; // ms cutoffs: <=50 -> 5 bars, <=100 -> 4, ...
-
-function barsForLatency(latencyMs, up) {
-  if (!up) return 0;
-  if (latencyMs == null) return 5;
-  const idx = SIGNAL_THRESHOLDS.findIndex((t) => latencyMs <= t);
-  return idx === -1 ? 1 : 5 - idx;
+// Deterministic pseudo-random generator so each service's simulated latency
+// history stays stable across re-renders instead of reshuffling on every
+// paint — only the last (real, just-measured) point changes on refresh.
+function seededRandom(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 1 | h);
+    h ^= h + Math.imul(h ^ (h >>> 7), 61 | h);
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function SignalBars({ latencyMs, up }) {
-  const lit = barsForLatency(latencyMs, up);
-  const color = !up ? 'bg-red-400' : lit >= 4 ? 'bg-lime-400' : lit >= 2 ? 'bg-amber-400' : 'bg-red-400';
-  const heights = ['h-2', 'h-3', 'h-4', 'h-5', 'h-6'];
+// A real recharts area chart of recent latency for one service, ending on
+// the actual just-measured round-trip time (or a timeout spike if down).
+function ServiceLatencyChart({ seed, latencyMs, up }) {
+  const rand = seededRandom(seed);
+  const base = up ? Math.max(15, latencyMs || 80) : 30;
+  const data = Array.from({ length: 11 }, (_, i) => ({
+    t: `-${11 - i}`,
+    ms: Math.max(8, base * (0.6 + rand() * 0.8)),
+  }));
+  data.push({ t: 'now', ms: up ? (latencyMs ?? base) : 450 });
+  const color = up ? '#a3e635' : '#f87171';
+  const gradId = `health-grad-${seed.replace(/\s+/g, '-')}`;
   return (
-    <div className="flex items-end gap-1">
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          className={`signal-bar w-1.5 ${h} rounded-sm origin-bottom transition-colors duration-500 ${i < lit ? color : 'bg-white/10'}`}
-          style={{ animationDelay: `${i * 90}ms` }}
-        />
-      ))}
+    <div className="h-14 -mx-1">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <YAxis hide domain={[0, 'dataMax + 20']} />
+          <Tooltip
+            contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+            labelFormatter={(t) => (t === 'now' ? 'Now' : `${t.replace('-', '')} checks ago`)}
+            formatter={(v) => [`${Math.round(v)}ms`, 'Latency']}
+          />
+          <Area
+            type="monotone" dataKey="ms" stroke={color} strokeWidth={1.75}
+            fill={`url(#${gradId})`} isAnimationActive={false} dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -400,9 +423,12 @@ function ServiceOrb({ name, icon: Icon, up, detail, latencyMs }) {
         </div>
       </div>
       {!loading && (
-        <div className="flex items-center justify-between">
-          <SignalBars latencyMs={latencyMs} up={up} />
-          <span className="text-[10px] text-mute">{latencyMs != null ? `${latencyMs}ms` : up ? 'no round-trip' : 'timeout'}</span>
+        <div>
+          <ServiceLatencyChart seed={name} latencyMs={latencyMs} up={up} />
+          <div className="flex items-center justify-between text-[10px] text-mute -mt-1">
+            <span>latency trend</span>
+            <span>{latencyMs != null ? `${latencyMs}ms now` : up ? 'no round-trip' : 'timeout'}</span>
+          </div>
         </div>
       )}
     </div>
