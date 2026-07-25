@@ -110,11 +110,11 @@ function slugifyCompany(company) {
   return `${String(company).toLowerCase().replace(/[^a-z0-9]+/g, '').trim() || 'portal'}.io`;
 }
 
-function SummaryCard({ label, value, hint, accent = false }) {
+function SummaryCard({ label, value, hint, accent = false, valueClassName = '' }) {
   return (
     <div className={`form-card min-h-[124px] rounded-[18px] border border-[var(--border)] ${accent ? 'gradient-border' : ''}`}>
       <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--body)] font-semibold mb-3">{label}</div>
-      <div className={`leading-none font-extrabold ${accent ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'} text-[40px]`}>
+      <div className={`leading-none font-extrabold ${accent ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'} text-[40px] ${valueClassName}`}>
         {value}
       </div>
       {hint ? <div className="mt-3 text-sm text-[var(--body)]">{hint}</div> : null}
@@ -240,7 +240,7 @@ export default function Transactions() {
       <div className="grid gap-4 lg:grid-cols-3">
         <SummaryCard label="Transactions" value={filtered.length} />
         <SummaryCard label="Total Paid" value={totalPaid > 0 ? money(totalPaid) : '—'} hint={`via ${providerLabel}`} />
-        <SummaryCard label="Portal" value={portalLabel} accent />
+        <SummaryCard label="Portal" value={portalLabel} accent valueClassName="text-[26px] sm:text-[30px] break-all" />
       </div>
 
       <div className="form-card rounded-[18px] border border-[var(--border)] space-y-4">
