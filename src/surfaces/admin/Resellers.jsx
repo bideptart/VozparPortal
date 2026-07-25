@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Phone, MapPin, Users as UsersIcon, Network, GitBranch } from 'lucide-react';
+import { Building2, Phone, MapPin, Users as UsersIcon, GitBranch } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -18,10 +18,16 @@ const initials = (name) => (name || '?')
 
 const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
 
-function StatTile({ icon, label, value }) {
+function StatTile({ icon, label, value, active, onClick }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] px-4 py-3 flex items-center gap-3">
-      <div className={`absolute inset-0 opacity-[0.06] ${BRAND_GRADIENT}`} aria-hidden="true" />
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative overflow-hidden rounded-xl border px-4 py-3 flex items-center gap-3 text-left transition ${
+        active ? 'border-[var(--primary)] shadow-[0_0_0_2px_var(--glow)]' : 'border-[var(--border)] hover:border-[var(--primary)]/60'
+      } bg-[var(--popover)]`}
+    >
+      <div className={`absolute inset-0 ${active ? 'opacity-[0.12]' : 'opacity-[0.06]'} ${BRAND_GRADIENT}`} aria-hidden="true" />
       <span className={`relative shrink-0 w-9 h-9 rounded-lg ${BRAND_GRADIENT} flex items-center justify-center text-white shadow-[0_0_16px_var(--glow)]`}>
         {icon}
       </span>
@@ -29,7 +35,7 @@ function StatTile({ icon, label, value }) {
         <div className="text-xl font-bold text-[var(--foreground)] leading-tight">{value}</div>
         <div className="text-[11px] uppercase tracking-wider text-mute">{label}</div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -160,6 +166,8 @@ export default function Resellers() {
   const [createdMsg, setCreatedMsg] = useState('');
   // When set to a reseller object, opens the customer-detail drawer.
   const [drilledReseller, setDrilledReseller] = useState(null);
+  // Clicking a stat tile filters the grid below; clicking it again clears the filter.
+  const [statFilter, setStatFilter] = useState(null); // null | 'resellers' | 'withCustomers'
 
   const load = async () => {
     setErr('');
@@ -335,16 +343,33 @@ export default function Resellers() {
       )}
       {effectiveList && effectiveList.length > 0 && (
         <>
-          <div className="grid sm:grid-cols-3 gap-3">
-            <StatTile icon={<Building2 className="w-4 h-4" />} label="Resellers" value={effectiveList.filter((r) => r.userType !== 'sub-reseller').length} />
-            <StatTile icon={<Network className="w-4 h-4" />} label="Sub-resellers" value={effectiveList.filter((r) => r.userType === 'sub-reseller').length} />
-            <StatTile icon={<UsersIcon className="w-4 h-4" />} label="Customers reached" value={effectiveList.reduce((s, r) => s + (r.customerCount || 0), 0)} />
+          <div className="grid sm:grid-cols-2 gap-3">
+            <StatTile
+              icon={<Building2 className="w-4 h-4" />}
+              label="Resellers"
+              value={effectiveList.filter((r) => r.userType !== 'sub-reseller').length}
+              active={statFilter === 'resellers'}
+              onClick={() => setStatFilter((f) => (f === 'resellers' ? null : 'resellers'))}
+            />
+            <StatTile
+              icon={<UsersIcon className="w-4 h-4" />}
+              label="Customers reached"
+              value={effectiveList.reduce((s, r) => s + (r.customerCount || 0), 0)}
+              active={statFilter === 'withCustomers'}
+              onClick={() => setStatFilter((f) => (f === 'withCustomers' ? null : 'withCustomers'))}
+            />
           </div>
 
           <div className="grid xl:grid-cols-2 gap-4">
-            {effectiveList.map((r) => (
-              <ResellerHub key={r.id} r={r} onDrill={setDrilledReseller} />
-            ))}
+            {effectiveList
+              .filter((r) => {
+                if (statFilter === 'resellers') return r.userType !== 'sub-reseller';
+                if (statFilter === 'withCustomers') return r.customerCount > 0;
+                return true;
+              })
+              .map((r) => (
+                <ResellerHub key={r.id} r={r} onDrill={setDrilledReseller} />
+              ))}
           </div>
         </>
       )}
