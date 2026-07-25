@@ -10,6 +10,8 @@ const fmtDate = (iso) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
 const EXPORT_COLUMNS = ['DID', 'Status', 'Owner', 'Source', 'Locality', 'Added Date'];
 
 const toExportRow = (n) => [
@@ -54,6 +56,18 @@ const dateStamp = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+// Shown only when the real inventory comes back genuinely empty — same
+// "never overrides real data" rule as the other admin pages' demo
+// fallbacks.
+const DEMO_NUMBERS = [
+  { value: '+14155550142', status: 'busy', source: 'db', owner: { label: 'Northwind Traders', email: 'priya@northwind.example' }, locality: 'San Francisco', region: 'CA', addedAt: daysAgo(40), addedBy: 'admin' },
+  { value: '+12125550198', status: 'busy', source: 'db', owner: { label: 'Bluepeak Studio', email: 'owen@bluepeak.example' }, locality: 'New York', region: 'NY', addedAt: daysAgo(28), addedBy: 'admin' },
+  { value: '+16465550110', status: 'busy', source: 'env', owner: { label: 'Larkspur Dental', email: 'maria@larkspur.example' }, locality: 'New York', region: 'NY', addedAt: daysAgo(90), addedBy: 'system' },
+  { value: '+13125550177', status: 'free', source: 'db', owner: null, locality: 'Chicago', region: 'IL', addedAt: daysAgo(12), addedBy: 'admin' },
+  { value: '+13055550163', status: 'free', source: 'db', owner: null, locality: 'Miami', region: 'FL', addedAt: daysAgo(6), addedBy: 'admin' },
+  { value: '+18005550100', status: 'free', source: 'env', owner: null, locality: 'Toll-free', region: null, addedAt: daysAgo(120), addedBy: 'system' },
+];
 
 // =============================================================================
 // Numbers inventory — superadmin's view of every DID in the pool. Shows
@@ -101,12 +115,19 @@ export default function Numbers() {
       writeCache('admin.numbers', currentUser?.id, r);
     } catch (e) {
       setErr(e.message);
+      setData((prev) => prev ?? { numbers: [], totals: { total: 0, busy: 0, free: 0 } });
     }
   };
   useEffect(() => { load(); }, []);
 
-  const numbers = data?.numbers || [];
-  const totals  = data?.totals  || { total: 0, busy: 0, free: 0 };
+  const realNumbers = data?.numbers || [];
+  // Falls back to demo DIDs only when the real inventory comes back
+  // genuinely empty — never overrides real data.
+  const usingDemo = data !== null && realNumbers.length === 0;
+  const numbers = usingDemo ? DEMO_NUMBERS : realNumbers;
+  const totals = usingDemo
+    ? { total: DEMO_NUMBERS.length, busy: DEMO_NUMBERS.filter((n) => n.status === 'busy').length, free: DEMO_NUMBERS.filter((n) => n.status === 'free').length }
+    : (data?.totals || { total: 0, busy: 0, free: 0 });
 
   // Memoized so toggling a row checkbox, typing in the add-number form, or
   // opening the export menu — none of which affect the result — doesn't
@@ -120,7 +141,7 @@ export default function Numbers() {
         && !(n.owner?.label || '').toLowerCase().includes(q)) return false;
     }
     return true;
-  }), [data, filter, search]);
+  }), [numbers, filter, search]);
 
   const runExport = (kind) => {
     setExportOpen(false);
@@ -156,6 +177,7 @@ export default function Numbers() {
   };
 
   const removeNumber = async (n) => {
+    if (usingDemo) return; // demo rows aren't real inventory — nothing to remove
     if (n.source === 'env') {
       alert('Env-managed DIDs cannot be removed from the UI — pull them out of MANUAL_NUMBERS in .env and restart.');
       return;
@@ -172,11 +194,12 @@ export default function Numbers() {
   return (
     <div>
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
+        <div className="flex items-center gap-3 flex-wrap">
           <p className="text-mute text-sm mt-1">
             Every DID available to the platform — assigned (busy) or unassigned (free).
             Add new DIDs as you receive them from the carrier.
           </p>
+          {usingDemo && <span className="overview-demo-pill">Demo data</span>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div ref={exportRef} className="relative inline-block">
@@ -191,23 +214,23 @@ export default function Numbers() {
               }
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 p-1.5 animate-modal-in">
+              <div className="absolute right-0 top-full mt-1.5 w-56 bg-[var(--popover)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden z-50 p-1.5 animate-modal-in">
                 <div className="px-2.5 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-mute font-semibold">
                   All {filtered.length} filtered
                 </div>
                 <button
                   type="button"
                   onClick={() => runExport('csv')}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm hover:bg-lime-50 transition-colors duration-150"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm text-[var(--foreground)] hover:bg-lime-500/10 hover:text-lime-400 transition-colors duration-150"
                 >
-                  <FileText className="w-4 h-4 text-lime-700" /> Export CSV
+                  <FileText className="w-4 h-4" /> Export CSV
                 </button>
                 <button
                   type="button"
                   onClick={() => runExport('excel')}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm hover:bg-lime-50 transition-colors duration-150"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm text-[var(--foreground)] hover:bg-lime-500/10 hover:text-lime-400 transition-colors duration-150"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-lime-700" /> Export Excel
+                  <FileSpreadsheet className="w-4 h-4" /> Export Excel
                 </button>
               </div>
             )}
@@ -222,12 +245,12 @@ export default function Numbers() {
       </div>
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           {err}
         </div>
       )}
       {okMsg && (
-        <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2">
           {okMsg}
         </div>
       )}
@@ -263,24 +286,33 @@ export default function Numbers() {
             </button>
           </div>
           {formErr && (
-            <div className="sm:col-span-4 text-xs text-red-600">⚠ {formErr}</div>
+            <div className="sm:col-span-4 text-xs text-red-400">⚠ {formErr}</div>
           )}
         </form>
       )}
 
       {/* === KPI cards ============================================== */}
       <div className="mt-6 grid sm:grid-cols-3 gap-3">
-        <div className={`form-card cursor-pointer border-2 border-lime-200 ${filter === 'all' ? 'ring-2 ring-lime-300' : ''}`} onClick={() => setFilter('all')}>
+        <div
+          className={`form-card cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg ${filter === 'all' ? 'ring-2 ring-[var(--primary)]' : ''}`}
+          onClick={() => setFilter('all')}
+        >
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total DIDs</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{totals.total}</div>
+          <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">{totals.total}</div>
         </div>
-        <div className={`form-card cursor-pointer border-2 border-lime-200 ${filter === 'busy' ? 'ring-2 ring-lime-300' : ''}`} onClick={() => setFilter('busy')}>
+        <div
+          className={`form-card cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg ${filter === 'busy' ? 'ring-2 ring-[var(--primary)]' : ''}`}
+          onClick={() => setFilter('busy')}
+        >
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Busy (assigned)</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{totals.busy}</div>
+          <div className="mt-1 text-2xl font-bold text-amber-400">{totals.busy}</div>
         </div>
-        <div className={`form-card cursor-pointer border-2 border-lime-200 ${filter === 'free' ? 'ring-2 ring-lime-300' : ''}`} onClick={() => setFilter('free')}>
+        <div
+          className={`form-card cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg ${filter === 'free' ? 'ring-2 ring-[var(--primary)]' : ''}`}
+          onClick={() => setFilter('free')}
+        >
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Free (available)</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{totals.free}</div>
+          <div className="mt-1 text-2xl font-bold text-emerald-400">{totals.free}</div>
         </div>
       </div>
 
@@ -319,25 +351,27 @@ export default function Numbers() {
             )}
             {filtered.map((n) => (
               <tr key={n.value}>
-                <td className="font-mono text-sm">{n.value}</td>
+                <td className="font-mono text-sm text-[var(--foreground)]">{n.value}</td>
                 <td>
                   {n.status === 'busy'
-                    ? <span className="pill bg-amber-500/15 text-amber-700">● Busy</span>
-                    : <span className="pill bg-emerald-500/15 text-emerald-700">○ Free</span>
+                    ? <span className="pill bg-amber-500/15 text-amber-400 inline-block cursor-default transition duration-150 ease-out hover:scale-110 hover:shadow-[0_0_10px_rgba(251,191,36,0.4)]">● Busy</span>
+                    : <span className="pill bg-emerald-500/15 text-emerald-400 inline-block cursor-default transition duration-150 ease-out hover:scale-110 hover:shadow-[0_0_10px_rgba(52,211,153,0.4)]">○ Free</span>
                   }
                 </td>
                 <td>
                   {n.owner
                     ? <>
-                        <div className="text-xs font-medium">{n.owner.label || n.owner.email}</div>
+                        <div className="text-xs font-medium text-[var(--foreground)]">{n.owner.label || n.owner.email}</div>
                         <div className="text-[11px] text-mute">{n.owner.email}</div>
                       </>
                     : <span className="text-mute text-xs">—</span>
                   }
                 </td>
                 <td>
-                  <span className={`pill text-[10px] uppercase tracking-wider ${
-                    n.source === 'env' ? 'bg-slate-200 text-slate-700' : 'bg-lime-100 text-lime-700'
+                  <span className={`pill text-[10px] uppercase tracking-wider inline-block cursor-default transition duration-150 ease-out hover:scale-110 ${
+                    n.source === 'env'
+                      ? 'bg-slate-500/15 text-[var(--body)] hover:shadow-[0_0_10px_rgba(148,163,184,0.35)]'
+                      : 'bg-lime-500/15 text-lime-400 hover:shadow-[0_0_10px_rgba(163,230,53,0.4)]'
                   }`}>
                     {n.source === 'env' ? 'ENV' : 'DB'}
                   </span>
@@ -349,7 +383,7 @@ export default function Numbers() {
                   {n.addedAt ? <>{fmtDate(n.addedAt)}<br /><span className="text-[10px]">by {n.addedBy || '—'}</span></> : '—'}
                 </td>
                 <td>
-                  {n.source === 'db' && n.status === 'free' && (
+                  {n.source === 'db' && n.status === 'free' && !usingDemo && (
                     <button className="btn-red text-xs" onClick={() => removeNumber(n)}>Remove</button>
                   )}
                 </td>
@@ -361,8 +395,8 @@ export default function Numbers() {
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 animate-pop-in">
-          <div className="flex items-center gap-2 bg-white border border-lime-200 shadow-xl rounded-xl px-4 py-3 text-sm font-medium text-slate-900">
-            <span className="text-lime-600">✓</span> {toast}
+          <div className="flex items-center gap-2 bg-[var(--popover)] border border-lime-500/30 shadow-xl rounded-xl px-4 py-3 text-sm font-medium text-[var(--foreground)]">
+            <span className="text-lime-400">✓</span> {toast}
           </div>
         </div>
       )}
