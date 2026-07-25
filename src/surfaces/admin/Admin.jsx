@@ -364,10 +364,28 @@ function LatencySparkline({ seed, latencyMs, up }) {
   points.push(latencyMs ?? base);
   const max = Math.max(...points) * 1.15;
   const w = 100, h = 28;
-  const path = points.map((v, i) => `${(i / (points.length - 1)) * w},${h - (v / max) * h}`).join(' ');
+  const coords = points.map((v, i) => [(i / (points.length - 1)) * w, h - (v / max) * h]);
+  const linePath = coords.map((p) => p.join(',')).join(' ');
+  const areaPath = `0,${h} ${linePath} ${w},${h}`;
+  const [lastX, lastY] = coords[coords.length - 1];
+  const color = up ? '#a3e635' : '#f87171';
+  const gradId = `spark-grad-${seed.replace(/\s+/g, '-')}`;
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-7" preserveAspectRatio="none">
-      <polyline points={path} fill="none" stroke={up ? '#a3e635' : '#f87171'} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-7 overflow-visible" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPath} fill={`url(#${gradId})`} className="sparkline-area" />
+      <polyline
+        points={linePath} fill="none" stroke={color} strokeWidth="1.5"
+        strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
+        pathLength="100" className="sparkline-line"
+      />
+      <circle cx={lastX} cy={lastY} r="4" fill={color} opacity="0.35" className="animate-ping" style={{ transformOrigin: `${lastX}px ${lastY}px` }} />
+      <circle cx={lastX} cy={lastY} r="1.8" fill={color} />
     </svg>
   );
 }

@@ -876,6 +876,23 @@ p {
     font-weight: 600;
     white-space: nowrap;
   }
+  @keyframes sparkline-draw {
+    from { stroke-dashoffset: 100; }
+    to   { stroke-dashoffset: 0; }
+  }
+  .sparkline-line {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: sparkline-draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes sparkline-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .sparkline-area {
+    opacity: 0;
+    animation: sparkline-fade 0.8s ease-out 0.6s forwards;
+  }
   .overview-banner,
   .overview-card {
     border: 1px solid rgba(148,163,184,0.16);
