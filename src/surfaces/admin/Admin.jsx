@@ -746,7 +746,6 @@ function McpBrowser() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">MCP browser</h1>
       <p className="text-mute">
         Run any tool exposed by a reseller's dashboard MCP server. Read-only tools are safe to explore.
       </p>
