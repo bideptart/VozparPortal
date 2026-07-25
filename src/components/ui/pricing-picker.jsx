@@ -1,7 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
-import confetti from "canvas-confetti";
+import { useState } from "react";
 import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 import { Check, Star } from "lucide-react";
@@ -78,28 +77,9 @@ export default function PricingPicker({
 }) {
   const [isMonthly, setIsMonthly] = useState(true);
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const switchRef = useRef(null);
 
   const handleToggle = (checked) => {
     setIsMonthly(!checked);
-
-    if (checked && switchRef.current && typeof window !== "undefined") {
-      const rect = switchRef.current.getBoundingClientRect();
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: {
-          x: (rect.left + rect.width / 2) / window.innerWidth,
-          y: (rect.top + rect.height / 2) / window.innerHeight,
-        },
-        colors: ["#046BD2", "#0086F9", "#22D3EE", "#FFFFFF"],
-        ticks: 200,
-        gravity: 1.2,
-        decay: 0.94,
-        startVelocity: 30,
-        shapes: ["circle"],
-      });
-    }
   };
 
   return (
@@ -118,7 +98,6 @@ export default function PricingPicker({
           <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5">
             <Label className="cursor-pointer">
               <Switch
-                ref={switchRef}
                 checked={!isMonthly}
                 onCheckedChange={handleToggle}
                 className="relative"
