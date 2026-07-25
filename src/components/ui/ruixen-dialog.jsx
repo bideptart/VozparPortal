@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+const BRAND_GRADIENT = "bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]";
+
 const initialsOf = (name) => {
   if (!name) return "NA";
   return String(name)
@@ -230,9 +232,14 @@ export default function Dialog01({ user, onSave, saveLabel = "Save Changes" }) {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : saveLabel}
-              </Button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="group relative overflow-hidden inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-medium text-white border border-white/25 transition duration-200 ease-out hover:scale-105 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+                <span className="relative">{saving ? "Saving..." : saveLabel}</span>
+              </button>
             </DialogFooter>
           </form>
         </div>
