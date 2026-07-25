@@ -149,28 +149,35 @@ function NewMrrChart({ data, days, onDaysChange }) {
         <ChartStat label="Total added" value={fmtCurrency(total)} valueClassName="text-[var(--primary)]" />
       </CardHeader>
       <CardContent>
-        <div style={{ width: '100%', height: 260 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="30%">
-              <defs>
-                <linearGradient id="newMrrBar" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0086F9" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#046BD2" stopOpacity={0.75} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
-              <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={44} />
-              <RechartsTooltip
-                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                contentStyle={{ backgroundColor: CHART_COLORS.tooltipBg, borderColor: CHART_COLORS.tooltipBorder, borderRadius: '0.5rem' }}
-                itemStyle={{ color: CHART_COLORS.tooltipText }}
-                labelStyle={{ color: CHART_COLORS.legend }}
-                formatter={(value) => [fmtCurrency(value), 'New MRR']}
-              />
-              <Bar dataKey="amount" fill="url(#newMrrBar)" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Bars get a fixed minimum width per day instead of always
+            squeezing to the card's width — at 7d that's narrower than the
+            card so no scrollbar shows (same look as before), but 14d/30d/90d
+            overflow into a horizontal scroll instead of the bars getting
+            crushed unreadably thin. */}
+        <div className="overflow-x-auto">
+          <div style={{ width: '100%', minWidth: Math.max(data.length * 40, 260), height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="30%">
+                <defs>
+                  <linearGradient id="newMrrBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0086F9" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#046BD2" stopOpacity={0.75} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
+                <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={44} />
+                <RechartsTooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  contentStyle={{ backgroundColor: CHART_COLORS.tooltipBg, borderColor: CHART_COLORS.tooltipBorder, borderRadius: '0.5rem' }}
+                  itemStyle={{ color: CHART_COLORS.tooltipText }}
+                  labelStyle={{ color: CHART_COLORS.legend }}
+                  formatter={(value) => [fmtCurrency(value), 'New MRR']}
+                />
+                <Bar dataKey="amount" fill="url(#newMrrBar)" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </CardContent>
     </Card>
