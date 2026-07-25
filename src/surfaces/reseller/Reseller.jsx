@@ -40,7 +40,9 @@ export default function Reseller() {
   // A sub-reseller hitting /reseller/sub-resellers directly is bounced home.
   if (!VALID.has(tab)) return <Navigate to="/reseller/customers" replace />;
 
-  const activeLabel = TABS.find((t) => t.id === tab)?.label;
+  const activeTab = TABS.find((t) => t.id === tab);
+  const activeLabel = activeTab?.label;
+  const ActiveIcon = activeTab?.Icon;
 
   return (
     <div className="dashboard-shell">
@@ -99,8 +101,15 @@ export default function Reseller() {
           >
             <Menu size={16} /> Menu
           </button>
-          <div className="lg:hidden text-xs text-mute font-semibold uppercase tracking-wider truncate">
-            {activeLabel}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            {ActiveIcon && (
+              <span className="flex w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
+                <ActiveIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />
+              </span>
+            )}
+            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-slate-900 truncate">
+              {activeLabel}
+            </h1>
           </div>
         </div>
 

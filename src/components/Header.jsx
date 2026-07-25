@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { UserPlus } from 'lucide-react';
 import { useApp } from '../AppContext.jsx';
 import Logo from './Logo.jsx';
 
@@ -74,7 +75,8 @@ export default function Header() {
           ) : (
             <>
               <Link to="/signin" className="nav-link">Sign in</Link>
-              <Link to="/signup/plan" className="btn-primary text-sm py-2 px-4">
+              <Link to="/signup/plan" className="btn-primary text-sm py-2 px-4 inline-flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4" strokeWidth={2} />
                 Get started →
               </Link>
             </>

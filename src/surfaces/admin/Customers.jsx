@@ -62,7 +62,6 @@ export default function Customers() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Customers</h1>
           <p className="text-mute">All live customers + technical IDs.</p>
         </div>
         <button className="btn-refresh" onClick={load} title="Refresh customers">

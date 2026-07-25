@@ -132,7 +132,6 @@ export default function CustomersAtRisk() {
     <div>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Customers at Risk</h1>
           <p className="text-mute">Signals for churn, overage, and failed provisioning — computed live from every customer's plan and usage.</p>
         </div>
         <button className="btn-refresh" onClick={load} title="Refresh risk assessment">

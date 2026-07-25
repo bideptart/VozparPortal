@@ -72,7 +72,6 @@ export default function Resellers() {
     <div>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">🏷 Resellers</h1>
           <p className="text-mute text-sm mt-1">
             Whitelabel partners with their own customer portal. Each reseller
             starts with the platform's default plans and can edit them upward.

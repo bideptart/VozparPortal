@@ -79,6 +79,7 @@ export function AppProvider({ children }) {
       }
       try {
         const { user } = await api('/api/me');
+        if (!user) throw new Error('no /api/me backend — falling back to demo user');
         if (cancelled) return;
         setCurrentUser(user);
         writeBootCache(t, user);
