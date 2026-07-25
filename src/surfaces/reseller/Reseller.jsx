@@ -55,7 +55,6 @@ export default function Reseller() {
           aria-label="kallus.io home"
         >
           <Logo size={44} showWordmark={false} />
-          <span className="font-mono text-sm lowercase text-mute tracking-tight">kallus.io</span>
         </Link>
 
         <div className="sidenav-scroll">

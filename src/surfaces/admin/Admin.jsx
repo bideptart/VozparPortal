@@ -168,8 +168,7 @@ export default function Admin() {
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
         <div className="h-16 flex items-center gap-1.5 px-3 bg-white sticky top-0 z-30">
           <Link to="/admin/overview" className="flex items-center gap-2 min-w-0" aria-label="kallus.io home">
-            <Logo size={36} showWordmark={false} />
-            <span className="font-mono text-sm lowercase text-mute tracking-tight whitespace-nowrap">kallus.io</span>
+            <Logo size={40} showWordmark={false} />
           </Link>
           {isAdminTier && (
             <button
