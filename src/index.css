@@ -22,6 +22,9 @@
   --input: rgba(255,255,255,0.07);
   --glow: rgba(4,107,210,0.35);
   --glow-strong: rgba(4,107,210,0.6);
+  /* Page-header icon badge gradient (Admin/Customer/Reseller topbars) */
+  --grad-start: #046BD2;
+  --grad-end: #22D3EE;
 
   /* Chart Colors */
   --chart-1: #046BD2;
