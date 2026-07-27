@@ -382,7 +382,7 @@ function ServiceLatencyChart({ seed, latencyMs, up }) {
           <YAxis hide domain={[0, 'dataMax + 20']} />
           <Tooltip
             contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
-            labelFormatter={(t) => (t === 'now' ? 'Now' : `${t.replace('-', '')} checks ago`)}
+            labelFormatter={(t) => (t === 'now' ? 'Now' : `${String(t).replace('-', '')} checks ago`)}
             formatter={(v) => [`${Math.round(v)}ms`, 'Latency']}
           />
           <Area
