@@ -105,7 +105,7 @@ export default function Customers() {
       </div>
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           {err}
         </div>
       )}
@@ -113,13 +113,13 @@ export default function Customers() {
       <div className="mt-6 grid sm:grid-cols-3 gap-3">
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total customers</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">
+          <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">
             {effectiveList === null ? '—' : effectiveList.length}
           </div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Numbers provisioned</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">
+          <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">
             {effectiveList === null ? '—' : effectiveList.reduce((a, c) => a + (c.numberCount || 0), 0)}
           </div>
         </div>
@@ -195,7 +195,7 @@ export default function Customers() {
                   </td>
                   <td>
                     <span className={`pill text-[10px] uppercase tracking-wider ${
-                      d.planCycle === 'yearly' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                      d.planCycle === 'yearly' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-500/15 text-[var(--body)]'
                     }`}>
                       {d.planCycle === 'yearly' ? 'Yearly' : 'Monthly'}
                     </span>

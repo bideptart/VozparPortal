@@ -112,12 +112,12 @@ export default function SubResellers() {
       </div>
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           {err}
         </div>
       )}
       {createdMsg && (
-        <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2">
           {createdMsg}
         </div>
       )}
@@ -125,7 +125,7 @@ export default function SubResellers() {
       {/* === Registration form ============================================== */}
       {showForm && (
         <form onSubmit={submit} className="mt-6 form-card space-y-4">
-          <div className="text-sm font-semibold text-slate-900">
+          <div className="text-sm font-semibold text-[var(--foreground)]">
             Register a new sub-reseller
           </div>
           <div className="text-xs text-mute">
@@ -196,7 +196,7 @@ export default function SubResellers() {
           </div>
 
           {formErr && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
               ⚠ {formErr}
             </div>
           )}
@@ -242,7 +242,7 @@ export default function SubResellers() {
                 <td>
                   <span className={r.customerCount > 0
                     ? 'pill pill-primary'
-                    : 'pill bg-slate-200 text-slate-600'}>
+                    : 'pill bg-slate-500/15 text-[var(--body)]'}>
                     {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'}
                   </span>
                 </td>

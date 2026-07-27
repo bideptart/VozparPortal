@@ -132,12 +132,12 @@ export default function Plans() {
       {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           ⚠ {err}
         </div>
       )}
       {msg && (
-        <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2">
           {msg}
         </div>
       )}
@@ -210,7 +210,7 @@ export default function Plans() {
                 </div>
 
                 {violatesFloor && (
-                  <div className="mt-3 text-xs text-red-600">⚠ {violatesFloor}</div>
+                  <div className="mt-3 text-xs text-red-400">⚠ {violatesFloor}</div>
                 )}
 
                 <div className="mt-4 flex items-center justify-end gap-2">
@@ -234,17 +234,17 @@ export default function Plans() {
                   Edit ›
                 </button>
               </div>
-              <div className="mt-1 text-lg font-extrabold text-slate-900">{p.label}</div>
+              <div className="mt-1 text-lg font-extrabold text-[var(--foreground)]">{p.label}</div>
               <div className="mt-3 flex items-end gap-1">
-                <span className="text-3xl font-extrabold text-slate-900">{inr(p.amount)}</span>
+                <span className="text-3xl font-extrabold text-[var(--foreground)]">{inr(p.amount)}</span>
                 <span className="text-xs text-mute pb-1">/mo</span>
               </div>
-              <ul className="mt-4 space-y-1.5 text-xs text-slate-700 flex-1">
+              <ul className="mt-4 space-y-1.5 text-xs text-[var(--body)] flex-1">
                 <li>• {p.min} included minutes</li>
                 <li>• ${p.rate}/min overage rate</li>
                 <li>• {p.agents >= 999 ? 'Unlimited' : p.agents} agents</li>
               </ul>
-              <div className="mt-3 text-[11px] text-mute pt-3 border-t border-slate-100">
+              <div className="mt-3 text-[11px] text-mute pt-3 border-t border-[var(--border)]">
                 Platform floor: {inr(floor.amount)} · ${floor.rate}/min — your margin is {inr(p.amount - floor.amount)}/mo.
               </div>
             </div>

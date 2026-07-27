@@ -43,12 +43,12 @@ const fmtMoney = (n, cur) => {
 const KIND_META = {
   'new-number-plan':   { label: 'New plan + DID',   pill: 'bg-primary/10 text-primary' },
   'plan-change':       { label: 'Plan change',      pill: 'bg-primary/10 text-primary' },
-  'plan-restart':      { label: 'Plan restart',     pill: 'bg-amber-100 text-amber-700' },
-  'topup':             { label: 'Wallet top-up',    pill: 'bg-emerald-100 text-emerald-700' },
-  'save-card':         { label: 'Card saved',       pill: 'bg-purple-100 text-purple-700' },
-  'signup':            { label: 'Signup',           pill: 'bg-fuchsia-100 text-fuchsia-700' },
+  'plan-restart':      { label: 'Plan restart',     pill: 'bg-amber-500/15 text-amber-400' },
+  'topup':             { label: 'Wallet top-up',    pill: 'bg-emerald-500/15 text-emerald-400' },
+  'save-card':         { label: 'Card saved',       pill: 'bg-purple-500/15 text-purple-400' },
+  'signup':            { label: 'Signup',           pill: 'bg-fuchsia-500/15 text-fuchsia-400' },
 };
-const kindMeta = (k) => KIND_META[k] || { label: k, pill: 'bg-slate-200 text-slate-700' };
+const kindMeta = (k) => KIND_META[k] || { label: k, pill: 'bg-slate-500/15 text-[var(--body)]' };
 
 // =============================================================================
 // Reseller Purchases — every plan and wallet transaction made by a customer
@@ -122,7 +122,7 @@ export default function Purchases() {
       </div>
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           {err}
         </div>
       )}
@@ -131,11 +131,11 @@ export default function Purchases() {
       <div className="mt-6 grid sm:grid-cols-4 gap-3">
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total transactions</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{effectiveList === null ? '—' : countAll}</div>
+          <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">{effectiveList === null ? '—' : countAll}</div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total volume</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{fmtMoney(sumAll, currency)}</div>
+          <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">{fmtMoney(sumAll, currency)}</div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">New plans bought</div>
@@ -144,7 +144,7 @@ export default function Purchases() {
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Wallet top-ups</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-700">{topupRow?.count || 0}</div>
+          <div className="mt-1 text-2xl font-bold text-emerald-400">{topupRow?.count || 0}</div>
           <div className="text-xs text-mute mt-0.5">{fmtMoney(topupRow?.sum || 0, currency)}</div>
         </div>
       </div>
@@ -212,19 +212,19 @@ export default function Purchases() {
                       {meta.label}
                     </span>
                   </td>
-                  <td className="text-xs text-slate-700">{p.description || '—'}</td>
+                  <td className="text-xs text-[var(--body)]">{p.description || '—'}</td>
                   <td className={`text-right whitespace-nowrap font-semibold ${
-                    isCredit ? 'text-emerald-600' : 'text-slate-900'
+                    isCredit ? 'text-emerald-400' : 'text-[var(--foreground)]'
                   }`}>
                     {p.amount ? `${isCredit ? '+' : ''}${fmtMoney(p.amount, currency)}` : '—'}
                   </td>
                   <td>
                     <span className={`pill text-[10px] uppercase tracking-wider ${
                       p.status === 'succeeded' || p.status === 'success'
-                        ? 'bg-green-100 text-green-700'
+                        ? 'bg-emerald-500/15 text-emerald-400'
                         : p.status === 'failed'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-amber-100 text-amber-700'
+                          ? 'bg-red-500/15 text-red-400'
+                          : 'bg-amber-500/15 text-amber-400'
                     }`}>
                       {p.status}
                     </span>
