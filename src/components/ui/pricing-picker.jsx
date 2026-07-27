@@ -10,63 +10,21 @@ import { buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { DEFAULT_PUBLIC_PLANS } from "@/lib/public-plan-catalog";
 import { cn } from "@/lib/utils";
 
-const defaultPlans = [
-  {
-    name: "Starter",
-    price: "29",
-    yearlyPrice: "24",
-    period: "per month",
-    features: [
-      "1 production AI voice agent",
-      "250 voice minutes included",
-      "1 phone number included",
-      "Basic analytics and call logs",
-      "Email support",
-    ],
-    description: "Best for small teams getting their first AI call workflow live.",
-    buttonText: "Choose Starter",
-    href: "/dashboard/billing",
-    isPopular: false,
-  },
-  {
-    name: "Professional",
-    price: "79",
-    yearlyPrice: "64",
-    period: "per month",
-    features: [
-      "3 AI voice agents",
-      "750 voice minutes included",
-      "2 live phone numbers",
-      "Advanced analytics and automations",
-      "Priority support",
-      "Shared wallet and plan controls",
-    ],
-    description: "A strong fit for growing teams that want cleaner AI call operations.",
-    buttonText: "Choose Professional",
-    href: "/dashboard/billing",
-    isPopular: true,
-  },
-  {
-    name: "Enterprise",
-    price: "199",
-    yearlyPrice: "169",
-    period: "per month",
-    features: [
-      "10 AI voice agents",
-      "2,500 voice minutes included",
-      "Multiple numbers and routing",
-      "Team-level reporting",
-      "Priority onboarding support",
-      "Custom rollout planning",
-    ],
-    description: "For larger teams that need more volume, more control, and more support.",
-    buttonText: "Talk to Sales",
-    href: "/dashboard/account",
-    isPopular: false,
-  },
-];
+const defaultPlans = DEFAULT_PUBLIC_PLANS.map((plan) => ({
+  id: plan.id,
+  name: plan.label,
+  price: String(plan.amount),
+  yearlyPrice: String(plan.yearlyAmount),
+  period: "per month",
+  features: plan.perks,
+  description: plan.sub,
+  buttonText: plan.featured ? `Choose ${plan.label}` : plan.id === "scale" ? "Talk to Sales" : `Choose ${plan.label}`,
+  href: plan.id === "scale" ? "/dashboard/account" : "/dashboard/billing",
+  isPopular: Boolean(plan.featured),
+}));
 
 export default function PricingPicker({
   plans = defaultPlans,
@@ -74,6 +32,8 @@ export default function PricingPicker({
   description = "Pick the plan that fits your call volume.",
   className,
   onPlanSelect,
+  selectedPlanId,
+  showBillingToggle = true,
 }) {
   const [isMonthly, setIsMonthly] = useState(true);
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -94,23 +54,27 @@ export default function PricingPicker({
           </p>
         </div>
 
-        <div className="flex justify-center">
-          <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5">
-            <Label className="cursor-pointer">
-              <Switch
-                checked={!isMonthly}
-                onCheckedChange={handleToggle}
-                className="relative"
-              />
-            </Label>
-            <span className="text-xs font-semibold text-[var(--foreground)] sm:text-sm">
-              Annual billing <span className="text-[var(--accent)]">(Save 20%)</span>
-            </span>
+        {showBillingToggle && (
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5">
+              <Label className="cursor-pointer">
+                <Switch
+                  checked={!isMonthly}
+                  onCheckedChange={handleToggle}
+                  className="relative"
+                />
+              </Label>
+              <span className="text-xs font-semibold text-[var(--foreground)] sm:text-sm">
+                Annual billing <span className="text-[var(--accent)]">(Save 20%)</span>
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {plans.map((plan, index) => (
+          {plans.map((plan, index) => {
+            const isSelected = selectedPlanId && String(selectedPlanId) === String(plan.id || plan.name);
+            return (
             <motion.div
               key={plan.name}
               initial={{ y: 30, opacity: 0 }}
@@ -134,10 +98,12 @@ export default function PricingPicker({
               }}
               className={cn(
                 "relative flex h-full flex-col rounded-[24px] border p-4 text-left shadow-[0_18px_50px_-30px_rgba(4,107,210,0.4)]",
-                plan.isPopular
+                isSelected
+                  ? "border-[var(--primary)] bg-[linear-gradient(180deg,rgba(4,107,210,0.18),rgba(255,255,255,0.06))] ring-2 ring-[var(--primary)]/30"
+                  : plan.isPopular
                   ? "border-[var(--primary)] bg-[linear-gradient(180deg,rgba(4,107,210,0.16),rgba(255,255,255,0.04))]"
                   : "border-[var(--border)] bg-[var(--card)]",
-                !plan.isPopular && "md:mt-6",
+                !plan.isPopular && !isSelected && "md:mt-6",
               )}
             >
               {plan.isPopular && (
@@ -199,7 +165,7 @@ export default function PricingPicker({
                       "w-full text-sm font-semibold",
                     )}
                   >
-                    {plan.buttonText}
+                    {isSelected ? "Selected" : plan.buttonText}
                   </button>
                 ) : (
                   <Link
@@ -214,7 +180,8 @@ export default function PricingPicker({
                 )}
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

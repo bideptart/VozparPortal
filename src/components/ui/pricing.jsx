@@ -14,78 +14,22 @@ import {
 } from 'lucide-react';
 import VerticalCutReveal from '@/components/ui/vertical-cut-reveal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DEFAULT_PUBLIC_PLANS } from '@/lib/public-plan-catalog';
 
-const PLANS = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    monthly: 9,
-    yearly: 90,
-    minutes: 100,
-    numbers: 1,
-    agents: 1,
-    responseTime: 'Email support',
-    description: 'For single-location teams that want a reliable AI front desk without extra setup overhead.',
-    eyebrow: 'Launch fast',
-    features: [
-      '100 included minutes each month',
-      '1 local or toll-free number',
-      '1 live AI voice agent',
-      'Basic call analytics',
-      'Simple business-hours routing',
-    ],
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    monthly: 29,
-    yearly: 290,
-    minutes: 500,
-    numbers: 2,
-    agents: 3,
-    responseTime: 'Priority support',
-    description: 'Best for growing teams that need multiple numbers, stronger reporting, and more automation capacity.',
-    eyebrow: 'Most popular',
-    popular: true,
-    features: [
-      '500 included minutes each month',
-      '2 phone numbers included',
-      '3 AI agents with custom prompts',
-      'Knowledge base and FAQ support',
-      'Advanced analytics and reporting',
-      'Priority support response times',
-    ],
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    monthly: 79,
-    yearly: 790,
-    minutes: 2000,
-    numbers: 5,
-    agents: 10,
-    responseTime: '24/7 support',
-    description: 'For high-volume operations that need deeper integrations, more coverage, and wider agent capacity.',
-    eyebrow: 'Built to scale',
-    features: [
-      '2,000 included minutes each month',
-      '5 phone numbers included',
-      '10 AI agents across teams',
-      'Custom integrations and API access',
-      'Shared analytics across accounts',
-      '24/7 support coverage',
-    ],
-  },
-];
-
-const COMPARISON_ROWS = [
-  { label: 'Included minutes', values: ['100 / month', '500 / month', '2,000 / month'] },
-  { label: 'Phone numbers', values: ['1', '2', '5'] },
-  { label: 'AI agents', values: ['1', '3', '10'] },
-  { label: 'Knowledge base', values: ['Basic', 'Advanced', 'Advanced'] },
-  { label: 'Analytics', values: ['Core', 'Advanced', 'Full suite'] },
-  { label: 'Support', values: ['Email', 'Priority', '24/7'] },
-];
+const PLANS = DEFAULT_PUBLIC_PLANS.map((plan) => ({
+  id: plan.id,
+  name: plan.label,
+  monthly: plan.amount,
+  yearly: plan.yearlyAmount,
+  minutes: plan.min,
+  numbers: plan.dids,
+  agents: plan.agents,
+  responseTime: plan.support,
+  description: plan.sub,
+  eyebrow: plan.eyebrow,
+  popular: Boolean(plan.featured),
+  features: plan.perks,
+}));
 
 const ENTERPRISE_POINTS = [
   'Volume-based pricing for high call throughput',
@@ -130,6 +74,15 @@ export default function PricingSection({ onSelectPlan }) {
       },
     ];
   }, [cycle]);
+
+  const comparisonRows = useMemo(() => ([
+    { label: 'Included minutes', values: PLANS.map((plan) => `${plan.minutes.toLocaleString('en-US')} / month`) },
+    { label: 'Phone numbers', values: PLANS.map((plan) => String(plan.numbers)) },
+    { label: 'AI agents', values: PLANS.map((plan) => (plan.agents >= 999 ? 'Unlimited' : String(plan.agents))) },
+    { label: 'Voice stack', values: ['Standard', 'Standard + premium', 'Realtime + premium'] },
+    { label: 'Billing', values: ['Per-second', 'Per-second', 'Per-second'] },
+    { label: 'Support', values: PLANS.map((plan) => plan.responseTime) },
+  ]), []);
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -181,7 +134,7 @@ export default function PricingSection({ onSelectPlan }) {
                   <CardTitle className="mt-2 text-xl text-[var(--foreground)]">Choose your plan cycle</CardTitle>
                 </div>
                 <span className="rounded-full bg-green-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-green-400">
-                  Save 17% yearly
+                  Save 20% yearly
                 </span>
               </div>
 
@@ -248,7 +201,7 @@ export default function PricingSection({ onSelectPlan }) {
                     : 'border-[var(--border)] bg-[var(--card)]'
                 }`}
               >
-                <CardHeader className="space-y-5 pb-5">
+                <CardHeader className="space-y-4 pb-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
@@ -263,9 +216,9 @@ export default function PricingSection({ onSelectPlan }) {
                     ) : null}
                   </div>
 
-                  <p className="min-h-[72px] text-sm leading-6 text-[var(--body)]">{plan.description}</p>
+                  <p className="text-sm leading-6 text-[var(--body)]">{plan.description}</p>
 
-                  <div className="flex items-end gap-1 text-[var(--foreground)]">
+                  <div className="pt-1 flex items-end gap-1 text-[var(--foreground)]">
                     <span className="pb-1 text-xl font-semibold">$</span>
                     <span className="text-5xl font-semibold leading-none">
                       <NumberFlow value={displayPrice} />
@@ -329,7 +282,7 @@ export default function PricingSection({ onSelectPlan }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPARISON_ROWS.map((row) => (
+                  {comparisonRows.map((row) => (
                     <tr key={row.label}>
                       <td className="text-[var(--body)]">{row.label}</td>
                       {row.values.map((value, index) => (
@@ -375,7 +328,7 @@ export default function PricingSection({ onSelectPlan }) {
 
             <a
               href="mailto:sales@vozper.com?subject=Enterprise%20plan%20inquiry"
-              className="btn-primary w-full inline-flex items-center justify-center"
+              className="btn-primary inline-flex w-full items-center justify-center text-center"
             >
               Talk to Sales
             </a>

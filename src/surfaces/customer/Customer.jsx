@@ -11,7 +11,7 @@ import BookingIcon from '../../components/BookingIcon.jsx';
 
 // Lazy load Numbers to avoid crashing on API failures in demo mode
 const NumbersLazy = lazy(() => import('./Numbers.jsx'));
-const PricingModalLazy = lazy(() => import('../../components/ui/pricing-modal.jsx'));
+const AddNumberModalLazy = lazy(() => import('./Numbers.jsx').then((module) => ({ default: module.AddNumberModal })));
 
 // Every tab body is its own chunk — a visitor on Overview never downloads
 // Billing/Templates/Playground code, and vice versa.
@@ -90,7 +90,7 @@ export default function Customer() {
   const { tab } = useParams();
   const [navOpen, setNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showAddPlan, setShowAddPlan] = useState(false);
   const callActivityActive = tab === CALL_ACTIVITY.id || CALL_ACTIVITY_CHILDREN.some((t) => t.id === tab);
   const [callActivityOpen, setCallActivityOpen] = useState(callActivityActive);
 
@@ -265,7 +265,7 @@ export default function Customer() {
             </h1>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowPricingModal(true)}>+ Add plan / number</button>
+            <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowAddPlan(true)}>+ Add plan / number</button>
           </div>
           <div className="absolute left-0 bottom-0 h-[3px] bg-[var(--primary)] transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
         </div>
@@ -283,11 +283,12 @@ export default function Customer() {
         </div>
       </div>
 
-      {showPricingModal && (
+      {showAddPlan && (
         <Suspense fallback={null}>
-          <PricingModalLazy
-            open={showPricingModal}
-            onClose={() => setShowPricingModal(false)}
+          <AddNumberModalLazy
+            currentUser={currentUser}
+            onClose={() => setShowAddPlan(false)}
+            onAdded={() => setShowAddPlan(false)}
           />
         </Suspense>
       )}

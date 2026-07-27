@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChevronDown,
   Download,
   RefreshCw,
   Search,
   Wallet,
+  Check,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import DatePickerField from '../../components/ui/date-picker.jsx';
@@ -113,14 +115,122 @@ function slugifyCompany(company) {
   return `${String(company).toLowerCase().replace(/[^a-z0-9]+/g, '').trim() || 'portal'}.io`;
 }
 
+function transactionKindMeta(kind) {
+  const key = String(kind || '').toLowerCase();
+  if (key.includes('topup') || key.includes('top-up') || key.includes('wallet')) {
+    return {
+      label: 'Wallet Top-up',
+      className: 'border border-sky-500/20 bg-sky-500/10 text-sky-300',
+    };
+  }
+  if (key.includes('plan') || key.includes('purchase') || key.includes('renewal')) {
+    return {
+      label: 'Plan Purchase',
+      className: 'border border-violet-500/20 bg-violet-500/10 text-violet-300',
+    };
+  }
+  if (key.includes('overflow') || key.includes('usage') || key.includes('charge')) {
+    return {
+      label: 'Usage Charge',
+      className: 'border border-amber-500/20 bg-amber-500/10 text-amber-300',
+    };
+  }
+  if (key.includes('refund') || key.includes('credit')) {
+    return {
+      label: 'Refund',
+      className: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-300',
+    };
+  }
+  return {
+    label: kind ? kind.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Transaction',
+    className: 'border border-[var(--primary)]/20 bg-[var(--glow)] text-[var(--foreground)]',
+  };
+}
+
+function transactionStatusMeta(status) {
+  const key = String(status || 'paid').toLowerCase();
+  if (['completed', 'success', 'succeeded', 'paid'].includes(key)) {
+    return {
+      label: 'Completed',
+      className: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-300',
+    };
+  }
+  if (['pending', 'processing'].includes(key)) {
+    return {
+      label: 'Pending',
+      className: 'border border-amber-500/20 bg-amber-500/10 text-amber-200',
+    };
+  }
+  if (['failed', 'declined', 'canceled'].includes(key)) {
+    return {
+      label: 'Failed',
+      className: 'border border-red-500/20 bg-red-500/10 text-red-300',
+    };
+  }
+  return {
+    label: status ? status.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Unknown',
+    className: 'border border-[var(--primary)]/20 bg-[var(--glow)] text-[var(--foreground)]',
+  };
+}
+
 function SummaryCard({ label, value, hint, accent = false, valueClassName = '' }) {
   return (
-    <div className={`form-card min-h-[124px] rounded-[18px] border border-[var(--border)] ${accent ? 'gradient-border' : ''}`}>
-      <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--body)] font-semibold mb-3">{label}</div>
-      <div className={`leading-none font-extrabold ${accent ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'} text-[40px] ${valueClassName}`}>
+    <div className={`form-card rounded-[20px] border border-[var(--border)] ${accent ? 'gradient-border' : ''}`}>
+      <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--body)] font-semibold">{label}</div>
+      <div className={`mt-3 leading-none font-extrabold ${accent ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'} text-[28px] ${valueClassName}`}>
         {value}
       </div>
       {hint ? <div className="mt-3 text-sm text-[var(--body)]">{hint}</div> : null}
+    </div>
+  );
+}
+
+function CustomSelect({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+  const displayLabel = selected ? selected.label : placeholder;
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="input w-full flex items-center justify-between gap-2 text-left"
+      >
+        <span className={selected ? 'text-[var(--foreground)]' : 'text-[var(--body)]'}>
+          {displayLabel}
+        </span>
+        <ChevronDown size={16} className={`text-[var(--body)] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-[12px] border border-[var(--border)] bg-[var(--popover)] shadow-2xl shadow-black/40 py-1.5 overflow-hidden animate-fade-up">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-sm transition-colors ${
+                value === opt.value
+                  ? 'bg-[var(--glow)] text-[var(--foreground)]'
+                  : 'text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value ? <Check size={15} className="text-[var(--primary)]" /> : null}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -146,6 +256,17 @@ export default function Transactions() {
   ).toLowerCase();
 
   const kindOptions = useMemo(() => [...new Set(DUMMY_TXNS.map((txn) => txn.kind))], []);
+
+  const kindDropdownOptions = useMemo(() => {
+    const opts = [{ value: 'all', label: 'All kinds' }];
+    kindOptions.forEach((k) => {
+      opts.push({
+        value: k,
+        label: transactionKindMeta(k).label,
+      });
+    });
+    return opts;
+  }, [kindOptions]);
 
   const filtered = useMemo(() => {
     const fromMs = dates.from ? startOfDay(new Date(dates.from)).getTime() : -Infinity;
@@ -244,11 +365,20 @@ export default function Transactions() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SummaryCard label="Transactions" value={filtered.length} />
-        <SummaryCard label="Total Paid" value={totalPaid > 0 ? money(totalPaid) : '—'} hint={`via ${providerLabel}`} />
-        <SummaryCard label="Portal" value={portalLabel} accent valueClassName="text-[26px] sm:text-[30px] break-all" />
+        <SummaryCard
+          label="Total Paid"
+          value={totalPaid > 0 ? money(totalPaid) : '--'}
+          hint={totalPaid > 0 ? `via ${providerLabel}` : 'No activity in range'}
+        />
+        <SummaryCard
+          label="Portal"
+          value={portalLabel}
+          accent
+          valueClassName="text-[22px] sm:text-[26px] break-all"
+        />
       </div>
 
-      <div className="form-card rounded-[18px] border border-[var(--border)] space-y-4">
+      <div className="form-card rounded-[20px] border border-[var(--border)] space-y-5">
         <div className="flex flex-wrap gap-2">
           {QUICK_RANGES.map((option) => (
             <button
@@ -291,14 +421,12 @@ export default function Transactions() {
 
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-1.5">Kind</label>
-            <select className="input" value={kind} onChange={(e) => setKind(e.target.value)}>
-              <option value="all">All kinds ({kindOptions.length})</option>
-              {kindOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option.replace(/\b\w/g, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              value={kind}
+              onChange={setKind}
+              options={kindDropdownOptions}
+              placeholder="Select kind"
+            />
           </div>
 
           <div>
@@ -316,7 +444,7 @@ export default function Transactions() {
         </div>
       </div>
 
-      <div className="form-card rounded-[18px] border border-[var(--border)] overflow-hidden p-0">
+      <div className="form-card rounded-[20px] border border-[var(--border)] overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-[rgba(255,255,255,0.03)]">
@@ -332,25 +460,33 @@ export default function Transactions() {
             </thead>
 
             <tbody>
-              {hasFilteredResults ? filtered.map((txn) => (
-                <tr key={txn.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)] transition-colors">
-                  <td className="px-6 py-4 text-[var(--foreground)] font-medium">{formatDate(txn.date)}</td>
-                  <td className="px-4 py-4 text-[var(--body)] capitalize">{txn.kind}</td>
-                  <td className="px-4 py-4 text-[var(--body)]">{txn.description}</td>
-                  <td className="px-4 py-4 text-[var(--foreground)] font-semibold">{money(txn.amount)}</td>
-                  <td className="px-4 py-4">
-                    <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border border-[var(--primary)] bg-[var(--glow)] text-[var(--foreground)]">
-                      {txn.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-[var(--body)]">{txn.provider}</td>
-                  <td className="px-4 py-4 font-mono text-xs text-[var(--body)]">{txn.ref}</td>
-                </tr>
-              )) : (
+              {hasFilteredResults ? filtered.map((txn) => {
+                const kindMeta = transactionKindMeta(txn.kind);
+                const statusMeta = transactionStatusMeta(txn.status);
+                return (
+                  <tr key={txn.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)] transition-colors">
+                    <td className="px-6 py-4 text-[var(--foreground)] font-medium">{formatDate(txn.date)}</td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${kindMeta.className}`}>
+                        {kindMeta.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-[var(--body)]">{txn.description}</td>
+                    <td className="px-4 py-4 text-[var(--foreground)] font-semibold">{money(txn.amount)}</td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${statusMeta.className}`}>
+                        {statusMeta.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-[var(--body)]">{txn.provider}</td>
+                    <td className="px-4 py-4 font-mono text-xs text-[var(--body)]">{txn.ref}</td>
+                  </tr>
+                );
+              }) : (
                 <tr>
                   <td colSpan={7} className="px-6 py-14">
                     <div className="flex flex-col items-center justify-center text-center min-h-[280px]">
-                      <div className="w-20 h-20 rounded-full bg-[var(--glow)] text-[var(--primary)] flex items-center justify-center mb-5 border border-[var(--primary)]">
+                      <div className="w-20 h-20 rounded-full bg-[var(--glow)] text-[var(--primary)] flex items-center justify-center mb-5 border border-[var(--primary)]/30">
                         <Wallet size={34} />
                       </div>
                       <div className="text-2xl font-semibold text-[var(--foreground)]">
@@ -376,7 +512,7 @@ export default function Transactions() {
                       {!hasAnyTransactions ? (
                         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-[var(--body)]">
                           <span>View Pricing</span>
-                          <span className="text-[var(--border)]">•</span>
+                          <span className="text-[var(--border)]">--</span>
                           <span>Learn about Billing</span>
                         </div>
                       ) : null}
