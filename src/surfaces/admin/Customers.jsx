@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, Mail, Phone, Hash, Wrench, Trash2 } from 'lucide-react';
+import { RefreshCw, Mail, Phone, Hash, Wrench, Trash2, RotateCw, Calendar, Tag } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
 import { readCache, writeCache } from '../../utils/swrCache.js';
@@ -64,59 +64,85 @@ function UsageBar({ used, total }) {
 // actual bar instead of a bare "x / y" number pair.
 function CustomerCard({ c, busyId, onProvision, onDelete, isDemo }) {
   const isLive = !!c.number;
+  // Buttons live on the back face — stop their clicks from bubbling so they
+  // never trigger anything on the (now purely hover-driven) flip container.
+  const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+
   return (
-    <div className="form-card flex flex-col gap-3 cursor-pointer transition-transform duration-150 ease-out active:scale-[0.97] hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-sm font-bold">
-            {initials(c.company || c.name)}
-          </span>
-          <div className="min-w-0">
-            <div className="font-semibold text-[var(--foreground)] truncate">{c.company || c.name}</div>
-            <div className="text-xs text-mute flex items-center gap-1 truncate"><Mail className="w-3 h-3 shrink-0" /> {c.email}</div>
+    <div className="flip-card" style={{ minHeight: 260 }}>
+      <div className="flip-card-inner">
+        {/* --- Front ----------------------------------------------------- */}
+        <div className="flip-card-face flip-card-front form-card flex flex-col gap-3 transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] flex items-center justify-center text-white text-sm font-bold">
+                {initials(c.company || c.name)}
+              </span>
+              <div className="min-w-0">
+                <div className="font-semibold text-[var(--foreground)] truncate">{c.company || c.name}</div>
+                <div className="text-xs text-mute flex items-center gap-1 truncate"><Mail className="w-3 h-3 shrink-0" /> {c.email}</div>
+              </div>
+            </div>
+            <span className={`pill text-[10px] uppercase tracking-wider font-semibold shrink-0 ${TYPE_STYLES[c.userType] || TYPE_STYLES.customer}`}>
+              {c.userType || 'user'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
+            <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {c.number || '—'}</span>
+            {c.viaPortal && <span className="text-lime-400 font-mono">{c.viaPortal}</span>}
+            <span>Joined {fmtDate(c.createdAt)}</span>
+          </div>
+
+          <UsageBar used={c.minutesUsed || 0} total={c.plan?.min || 0} />
+
+          <div className="flex items-center justify-between gap-2 pt-1 mt-auto border-t border-[var(--border)]">
+            <span className={`inline-block pill text-[10px] uppercase tracking-wider font-semibold ${
+              isLive ? 'bg-lime-500/15 text-lime-400' : 'bg-amber-500/15 text-amber-400'
+            }`}>
+              {isLive ? 'Live' : 'No number'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-mute uppercase tracking-wider font-semibold">
+              <RotateCw className="w-3 h-3" /> Hover for details
+            </span>
           </div>
         </div>
-        <span className={`pill text-[10px] uppercase tracking-wider font-semibold shrink-0 ${TYPE_STYLES[c.userType] || TYPE_STYLES.customer}`}>
-          {c.userType || 'user'}
-        </span>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-        <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {c.number || '—'}</span>
-        {c.viaPortal && <span className="text-lime-400 font-mono">{c.viaPortal}</span>}
-        <span>Joined {fmtDate(c.createdAt)}</span>
-      </div>
+        {/* --- Back ------------------------------------------------------- */}
+        <div className="flip-card-face flip-card-back form-card flex flex-col gap-3">
+          <div className="font-semibold text-[var(--foreground)] truncate">{c.company || c.name}</div>
 
-      <UsageBar used={c.minutesUsed || 0} total={c.plan?.min || 0} />
+          <div className="flex flex-col gap-2 text-xs text-mute">
+            <div className="flex items-center gap-2"><Mail className="w-3 h-3 shrink-0" /> <span className="truncate text-[var(--foreground)]">{c.email}</span></div>
+            <div className="flex items-center gap-2"><Phone className="w-3 h-3 shrink-0" /> <span className="text-[var(--foreground)]">{c.number || 'No number'}</span></div>
+            <div className="flex items-center gap-2"><Hash className="w-3 h-3 shrink-0" /> <span className="font-mono text-[var(--foreground)] truncate">{c.twilioSid || 'no Twilio SID'}</span></div>
+            <div className="flex items-center gap-2"><Tag className="w-3 h-3 shrink-0" /> <span className="text-[var(--foreground)]">{c.plan ? `$${c.plan.amount}/mo · ${c.plan.min} min included` : 'no plan'}</span></div>
+            {c.viaPortal && <div className="flex items-center gap-2"><Tag className="w-3 h-3 shrink-0" /> <span className="text-lime-400 font-mono">{c.viaPortal}</span></div>}
+            <div className="flex items-center gap-2"><Calendar className="w-3 h-3 shrink-0" /> <span className="text-[var(--foreground)]">Joined {fmtDate(c.createdAt)}</span></div>
+          </div>
 
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1 text-[10px] text-mute font-mono truncate"><Hash className="w-3 h-3 shrink-0" /> {c.twilioSid || 'no Twilio SID'}</div>
-          <span className={`mt-1 inline-block pill text-[10px] uppercase tracking-wider font-semibold ${
-            isLive ? 'bg-lime-500/15 text-lime-400' : 'bg-amber-500/15 text-amber-400'
-          }`}>
-            {isLive ? 'Live' : 'No number'}
-          </span>
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          {c.number && (
+          <UsageBar used={c.minutesUsed || 0} total={c.plan?.min || 0} />
+
+          <div className="flex gap-1.5 mt-auto pt-1 border-t border-[var(--border)]">
+            {c.number && (
+              <button
+                className="btn-ghost text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={isDemo || busyId === c.id + ':prov'}
+                onClick={stop(() => onProvision(c))}
+                title={isDemo ? 'Demo data — not a real account, nothing to provision' : 'Recreate inbound trunk + dispatch rule + voice agent'}
+              >
+                <Wrench className="w-3 h-3" /> {busyId === c.id + ':prov' ? '…' : 'Provision'}
+              </button>
+            )}
             <button
-              className="btn-ghost text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={isDemo || busyId === c.id + ':prov'}
-              onClick={() => onProvision(c)}
-              title={isDemo ? 'Demo data — not a real account, nothing to provision' : 'Recreate inbound trunk + dispatch rule + voice agent'}
+              className="btn-red text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={isDemo || busyId === c.id}
+              onClick={stop(() => onDelete(c))}
+              title={isDemo ? 'Demo data — not a real account, nothing to delete' : undefined}
             >
-              <Wrench className="w-3 h-3" /> {busyId === c.id + ':prov' ? '…' : 'Provision'}
+              <Trash2 className="w-3 h-3" /> {busyId === c.id ? '…' : 'Delete'}
             </button>
-          )}
-          <button
-            className="btn-red text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={isDemo || busyId === c.id}
-            onClick={() => onDelete(c)}
-            title={isDemo ? 'Demo data — not a real account, nothing to delete' : undefined}
-          >
-            <Trash2 className="w-3 h-3" /> {busyId === c.id ? '…' : 'Delete'}
-          </button>
+          </div>
         </div>
       </div>
     </div>

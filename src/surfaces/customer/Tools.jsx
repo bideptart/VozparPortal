@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Search, PhoneForwarded, BellRing, Radio, Check, ChevronRight } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 
 // =============================================================================
 // Tools — per-agent call settings.
 //
-// Numbers/agents are picked from a card grid (one per plan/number) — tapping
-// a card selects it and reveals its tools below, with a chevron + "Editing"
-// pill marking the open card.
+// Two-column layout: a searchable list of plans/numbers on the left, the
+// selected number's tool config (call transfer, booking notifications) on
+// the right. When the account has no numbers yet, falls back to read-only
+// demo data (same "never overrides real data" convention used on the other
+// admin/customer surfaces) so the page always demonstrates the real UI.
 //
 // Two tool sections per selected number:
 //  - Blind transfer: the number the agent hands a caller off to when asked
@@ -56,6 +58,21 @@ const writeNumbersCache = (userId, numbers) => {
   } catch { /* storage full / private-mode — just skip caching */ }
 };
 
+// Shown only when the real number list comes back genuinely empty — never
+// overrides real data. Read-only: saves on these are simulated locally so
+// the demo doesn't hit the API with a fake number id.
+const DEMO_NUMBERS = [
+  { id: 'demo-1', value: '+14155550142', agentName: 'Front Desk', agentSlug: 'front-desk', plan: { label: 'Growth' } },
+  { id: 'demo-2', value: '+12125550198', agentName: 'Sales Line', agentSlug: 'sales-line', plan: { label: 'Starter' } },
+  { id: 'demo-3', value: '+16465550110', agentName: 'Support Bot', agentSlug: 'support-bot', plan: { label: 'Scale' } },
+];
+const DEMO_TRANSFER = {
+  'demo-1': { number: '+14155550199', destinationName: 'Front desk manager' },
+  'demo-2': { number: '', destinationName: '' },
+  'demo-3': { number: '+16465550188', destinationName: 'On-call support lead' },
+};
+const isDemoId = (id) => typeof id === 'string' && id.startsWith('demo-');
+
 function Toggle({ on, onChange, disabled }) {
   return (
     <button
@@ -65,7 +82,7 @@ function Toggle({ on, onChange, disabled }) {
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors duration-200 ease-out shrink-0 ${
-        on ? 'bg-lime-600' : 'bg-slate-300 dark:bg-slate-700'
+        on ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}`}
     >
       <span className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] ${on ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -78,6 +95,7 @@ export default function Tools() {
   const [numbers, setNumbers] = useState(() => readNumbersCache(currentUser?.id) ?? []);
   const [selectedId, setSelectedId] = useState('');
   const [loadingNumbers, setLoadingNumbers] = useState(true);
+  const [search, setSearch] = useState('');
 
   // Blind-transfer state.
   const [current, setCurrent] = useState(null);   // { number, destinationName, source } | null
@@ -119,7 +137,19 @@ export default function Tools() {
   };
   useEffect(() => { loadNumbers(); }, []);
 
-  const selected = useMemo(() => numbers.find((n) => n.id === selectedId) || null, [numbers, selectedId]);
+  const usingDemo = !loadingNumbers && numbers.length === 0;
+  const effectiveNumbers = usingDemo ? DEMO_NUMBERS : numbers;
+
+  const filteredNumbers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return effectiveNumbers;
+    return effectiveNumbers.filter((n) =>
+      (n.agentName || n.label || '').toLowerCase().includes(q)
+      || (n.value || '').toLowerCase().includes(q)
+      || (n.agentSlug || '').toLowerCase().includes(q));
+  }, [effectiveNumbers, search]);
+
+  const selected = useMemo(() => effectiveNumbers.find((n) => n.id === selectedId) || null, [effectiveNumbers, selectedId]);
 
   const loadCurrent = async (id) => {
     if (!id) return;
@@ -127,6 +157,13 @@ export default function Tools() {
     setTransferOn(true);
     setNotifOn(false);
     setNotifEmail('');
+    if (isDemoId(id)) {
+      const demo = DEMO_TRANSFER[id] || { number: '', destinationName: '' };
+      setCurrent(demo.number ? demo : null);
+      setInput(stripCountryCode(demo.number));
+      setDestLabel(demo.destinationName || '');
+      return;
+    }
     setCurLoading(true);
     try {
       const r = await api(`/api/numbers/${id}/transfer`);
@@ -152,11 +189,21 @@ export default function Tools() {
     setPendingSave({ number: `${COUNTRY_CODE}${input.trim()}`, label: destLabel.trim() });
   };
 
-  // Step 2 — actually persist, then start the propagation countdown.
+  // Step 2 — actually persist, then start the propagation countdown. Demo
+  // numbers simulate the same flow locally instead of hitting the API.
   const confirmSave = async () => {
     const { number, label } = pendingSave;
     setPendingSave(null);
     setErr(''); setMsg('');
+    if (isDemoId(selectedId)) {
+      setBusy(true);
+      DEMO_TRANSFER[selectedId] = { number, destinationName: label };
+      setMsg('✓ Saved — applying the forwarding number to your agent.');
+      setPropagating({ secondsLeft: PROPAGATION_SECONDS, totalSeconds: PROPAGATION_SECONDS });
+      setCurrent({ number, destinationName: label });
+      setBusy(false);
+      return;
+    }
     setBusy(true);
     try {
       await api(`/api/numbers/${selectedId}/transfer`, { method: 'POST', body: { number, name: label } });
@@ -180,12 +227,14 @@ export default function Tools() {
 
   return (
     <div>
-      {/* Icon + "Tools" title now live in the sticky top bar instead of here. */}
-      <p className="text-base font-semibold tracking-wide animate-fade-up" style={{ color: 'var(--ink-2)' }}>
-        Pick a plan / number below, then configure its tools — call transfer, booking notifications, more soon.
-        Changes take effect on the next call (no restart needed).
-        {loadingNumbers && numbers.length > 0 && <span className="font-normal text-xs text-mute ml-2">Refreshing…</span>}
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap animate-fade-up">
+        <p className="text-base font-semibold tracking-wide max-w-2xl" style={{ color: 'var(--ink-2)' }}>
+          Pick a plan / number below, then configure its tools — call transfer, booking notifications, more soon.
+          Changes take effect on the next call (no restart needed).
+          {loadingNumbers && numbers.length > 0 && <span className="font-normal text-xs text-mute ml-2">Refreshing…</span>}
+        </p>
+        {usingDemo && <span className="overview-demo-pill shrink-0">Demo data</span>}
+      </div>
 
       <div className="mt-4">
         <button onClick={loadNumbers} disabled={loadingNumbers} className="btn-refresh">
@@ -195,10 +244,10 @@ export default function Tools() {
 
       {/* Propagation banner — shown after a save while the change goes live. */}
       {propagating && (
-        <div className={`mt-4 rounded-xl border p-4 animate-fade-up ${propagationLocked ? 'border-lime-300 bg-lime-50' : 'border-green-300 bg-green-50'}`}>
+        <div className={`mt-4 rounded-xl border p-4 animate-fade-up ${propagationLocked ? 'border-blue-300 bg-blue-50' : 'border-blue-300 bg-blue-50'}`}>
           {propagationLocked ? (
             <>
-              <div className="flex items-center gap-2 text-sm font-semibold text-lime-700">
+              <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
                 <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="50" strokeDashoffset="20" />
                 </svg>
@@ -208,16 +257,16 @@ export default function Tools() {
                 Applying the new call-forwarding number and restarting your voice agent.{' '}
                 <strong>Please wait {fmtTime(propagating.secondsLeft)} before placing a test call.</strong>
               </p>
-              <div className="mt-3 h-1.5 w-full rounded-full bg-lime-100 overflow-hidden">
+              <div className="mt-3 h-1.5 w-full rounded-full bg-blue-100 overflow-hidden">
                 <div
-                  className="h-full bg-lime-500 transition-all"
+                  className="h-full bg-blue-500 transition-all"
                   style={{ width: `${((propagating.totalSeconds - propagating.secondsLeft) / propagating.totalSeconds) * 100}%` }}
                 />
               </div>
             </>
           ) : (
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="text-sm font-semibold text-green-700">
+              <div className="text-sm font-semibold text-blue-700">
                 ✓ Ready — call forwarding is live
                 {selected?.value && <span className="font-normal text-slate-700"> · dial <span className="font-mono">{selected.value}</span> to test</span>}
               </div>
@@ -227,193 +276,218 @@ export default function Tools() {
         </div>
       )}
 
-      {numbers.length === 0 ? (
-        <div className="mt-6 form-card text-center text-mute py-10">
+      {effectiveNumbers.length === 0 ? (
+        <div className="mt-6 form-card border-blue-500/30 text-center text-mute py-10">
           {loadingNumbers ? 'Loading your numbers…' : 'No numbers yet. Add one from Plan & Numbers to configure tools.'}
         </div>
       ) : (
-        <>
-          <div className="flex items-center gap-2 mt-6 mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-mute font-semibold">Your plans &amp; numbers</span>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {numbers.map((n, i) => {
-              const isOpen = selectedId === n.id;
-              return (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => selectCard(n.id)}
-                  disabled={propagationLocked}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                  className={`form-card text-left transition duration-200 ease-out relative animate-fade-up hover:shadow-md hover:-translate-y-0.5 ${isOpen ? 'border-lime-400 ring-2 ring-lime-500/30' : ''}`}
-                >
-                  <span className={`absolute top-4 right-4 text-mute transition-transform duration-200 ease-out ${isOpen ? 'rotate-180' : ''}`}>▾</span>
-                  <div className="font-bold text-slate-900 dark:text-slate-100 truncate pr-6">
-                    {n.agentName || n.label || 'Unnamed agent'}
-                  </div>
-                  <span className="mt-0.5 block text-sm text-lime-600 dark:text-lime-400 font-mono">
-                    {n.value}
-                  </span>
-                  {n.agentSlug && (
-                    <div className="mt-0.5 text-xs text-mute font-mono truncate">{n.agentSlug}</div>
-                  )}
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="pill bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-300 text-[10px] uppercase tracking-wider font-semibold">
-                      {n.plan?.label || 'Starter'}
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,340px)_1fr] lg:items-start animate-fade-up">
+          {/* --- Left: searchable plan/number list --------------------------- */}
+          <div className="flex flex-col gap-3 lg:sticky lg:top-20 lg:self-start">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--body)] pointer-events-none" />
+              <input
+                className="input pl-9 text-sm"
+                placeholder="Search plans or numbers…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 max-h-[calc(100vh-11rem)] overflow-y-auto pr-1">
+              {filteredNumbers.length === 0 && (
+                <p className="text-sm text-mute italic py-4 text-center">No matches for “{search}”.</p>
+              )}
+              {filteredNumbers.map((n, i) => {
+                const isOpen = selectedId === n.id;
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => selectCard(n.id)}
+                    disabled={propagationLocked}
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className="form-card border-blue-500/30 tap-shadow text-left transition duration-200 ease-out relative animate-fade-up hover:shadow-md hover:-translate-y-0.5 flex items-center gap-3 py-3"
+                  >
+                    <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isOpen ? 'bg-blue-500/20 text-blue-400' : 'bg-[var(--muted)] text-[var(--body)]'}`}>
+                      <Radio size={16} />
                     </span>
-                    {isOpen && (
-                      <span className="pill bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-300 text-[10px] uppercase tracking-wider font-semibold animate-pop-in">
-                        Editing
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-[var(--foreground)] truncate">
+                        {n.agentName || n.label || 'Unnamed agent'}
+                      </div>
+                      <span className="block text-xs text-[var(--body)] font-mono truncate">
+                        {n.value}
                       </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="pill bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 text-[10px] uppercase tracking-wider font-semibold">
+                          {n.plan?.label || 'Starter'}
+                        </span>
+                        {isOpen && (
+                          <span className="pill bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 text-[10px] uppercase tracking-wider font-semibold animate-pop-in">
+                            Editing
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className={`shrink-0 text-[var(--body)] transition-transform duration-200 ease-out ${isOpen ? 'rotate-90' : ''}`} />
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {!selected ? (
-            <p className="mt-4 text-sm text-mute italic">↑ Tap a card above to configure its tools.</p>
-          ) : (
-            <>
-              <div className="mt-8 flex items-start justify-between gap-3 animate-fade-up">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">Configuring</div>
-                  <div className="mt-0.5 font-bold text-slate-900 dark:text-slate-100">
-                    {selected.agentName || selected.label || 'Unnamed agent'}{' '}
-                    <span className="font-mono font-normal text-mute text-sm">{selected.value}</span>
-                  </div>
-                </div>
-                <button onClick={() => setSelectedId('')} className="btn-teal text-sm transition duration-200 ease-out hover:scale-105 active:scale-95">✕ Close</button>
+          {/* --- Right: tool config panel ------------------------------------ */}
+          <div>
+            {!selected ? (
+              <div className="form-card border-blue-500/30 py-16 text-center text-mute">
+                <Radio size={22} className="mx-auto mb-3 opacity-50" />
+                Select a plan / number on the left to configure its tools.
               </div>
-
-              {/* Blind transfer ------------------------------------------------ */}
-              <div className="text-[10px] uppercase tracking-wider text-mute font-semibold mt-6 mb-2 animate-fade-up">Blind transfer</div>
-              <div className="form-card animate-fade-up border-lime-200 dark:border-lime-500/30 transition duration-300 ease-out hover:shadow-md">
-                <div className="flex items-start justify-between gap-3">
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-3 animate-fade-up">
                   <div>
-                    <div className="font-bold text-slate-900 dark:text-slate-100">
-                      {selected.agentName || selected.label || 'Unnamed agent'}
-                    </div>
-                    <div className="text-xs text-mute mt-0.5">
-                      <span className="font-mono">{selected.value}</span>
-                      {selected.agentSlug && <> · {selected.agentSlug}</>}
+                    <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">Configuring</div>
+                    <div className="mt-0.5 font-bold text-[var(--foreground)]">
+                      {selected.agentName || selected.label || 'Unnamed agent'}{' '}
+                      <span className="font-mono font-normal text-mute text-sm">{selected.value}</span>
                     </div>
                   </div>
-                  <Toggle on={transferOn} onChange={setTransferOn} disabled={curLoading || busy || propagationLocked} />
+                  <button onClick={() => setSelectedId('')} className="btn-teal text-sm transition duration-200 ease-out hover:scale-105 active:scale-95">✕ Close</button>
                 </div>
 
-                {!transferOn ? (
-                  <p className="mt-4 text-sm text-mute">Blind transfer is off — callers won’t be offered a human handoff.</p>
-                ) : (
-                  <>
-                    <div className="mt-4">
-                      <label className="field-label">Transfer number</label>
-                      <div className="flex items-stretch gap-2">
-                        <span className="input w-auto px-3 flex items-center font-mono text-sm bg-slate-50 dark:bg-slate-800 shrink-0">
-                          {COUNTRY_CODE}
-                        </span>
+                {/* Blind transfer -------------------------------------------- */}
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-mute font-semibold mt-6 mb-2 animate-fade-up">
+                  <PhoneForwarded size={12} /> Blind transfer
+                </div>
+                <div className="form-card animate-fade-up border-blue-500/30 transition duration-300 ease-out hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-bold text-[var(--foreground)]">
+                        {selected.agentName || selected.label || 'Unnamed agent'}
+                      </div>
+                      <div className="text-xs text-mute mt-0.5">
+                        <span className="font-mono">{selected.value}</span>
+                        {selected.agentSlug && <> · {selected.agentSlug}</>}
+                      </div>
+                    </div>
+                    <Toggle on={transferOn} onChange={setTransferOn} disabled={curLoading || busy || propagationLocked} />
+                  </div>
+
+                  {!transferOn ? (
+                    <p className="mt-4 text-sm text-mute">Blind transfer is off — callers won’t be offered a human handoff.</p>
+                  ) : (
+                    <>
+                      <div className="mt-4">
+                        <label className="field-label">Transfer number</label>
+                        <div className="flex items-stretch gap-2">
+                          <span className="input w-auto px-3 flex items-center font-mono text-sm bg-slate-50 dark:bg-slate-800 shrink-0">
+                            {COUNTRY_CODE}
+                          </span>
+                          <input
+                            className="input font-mono transition duration-200 ease-out focus:shadow-md"
+                            value={input}
+                            onChange={(e) => { setInput(e.target.value.replace(/[^\d]/g, '')); setMsg(''); setErr(''); }}
+                            placeholder="5551234567"
+                            disabled={curLoading || busy || propagationLocked}
+                          />
+                        </div>
+                        <div className="text-[11px] text-mute mt-1">
+                          You can’t forward to one of your own inbound numbers.
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="field-label">Destination label (optional)</label>
                         <input
-                          className="input font-mono transition duration-200 ease-out focus:shadow-md"
-                          value={input}
-                          onChange={(e) => { setInput(e.target.value.replace(/[^\d]/g, '')); setMsg(''); setErr(''); }}
-                          placeholder="5551234567"
+                          className="input transition duration-200 ease-out focus:shadow-md"
+                          value={destLabel}
+                          onChange={(e) => setDestLabel(e.target.value)}
+                          placeholder="e.g. Manager, Sales lead"
                           disabled={curLoading || busy || propagationLocked}
                         />
                       </div>
-                      <div className="text-[11px] text-mute mt-1">
-                        You can’t forward to one of your own inbound numbers.
+
+                      <div className="mt-3 flex items-center gap-3 flex-wrap">
+                        {curLoading ? (
+                          <span className="text-xs text-mute">Loading current…</span>
+                        ) : current?.number ? (
+                          <span className="text-xs text-mute inline-flex items-center gap-1">
+                            <Check size={12} className="text-blue-400" /> Currently routing transfers to{' '}
+                            <span className="font-mono text-[var(--foreground)]">{current.number}</span>
+                            {current.destinationName && <> ({current.destinationName})</>}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-mute">No forwarding number set yet.</span>
+                        )}
+                        <button
+                          className="btn-teal ml-auto transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-90"
+                          onClick={requestSave}
+                          disabled={busy || curLoading || propagationLocked || !input.trim()}
+                        >
+                          {propagationLocked ? `⏳ Locked · ${propagating.secondsLeft}s` : (busy ? 'Saving…' : 'Save transfer number')}
+                        </button>
                       </div>
-                    </div>
 
-                    <div className="mt-3">
-                      <label className="field-label">Destination label (optional)</label>
-                      <input
-                        className="input transition duration-200 ease-out focus:shadow-md"
-                        value={destLabel}
-                        onChange={(e) => setDestLabel(e.target.value)}
-                        placeholder="e.g. Manager, Sales lead"
-                        disabled={curLoading || busy || propagationLocked}
-                      />
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-3 flex-wrap">
-                      {curLoading ? (
-                        <span className="text-xs text-mute">Loading current…</span>
-                      ) : current?.number ? (
-                        <span className="text-xs text-mute">
-                          Currently routing transfers to{' '}
-                          <span className="font-mono text-slate-900 dark:text-slate-100">{current.number}</span>
-                          {current.destinationName && <> ({current.destinationName})</>}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-mute">No forwarding number set yet.</span>
-                      )}
-                      <button
-                        className="btn-teal ml-auto transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-90"
-                        onClick={requestSave}
-                        disabled={busy || curLoading || propagationLocked || !input.trim()}
-                      >
-                        {propagationLocked ? `⏳ Locked · ${propagating.secondsLeft}s` : (busy ? 'Saving…' : 'Save transfer number')}
-                      </button>
-                    </div>
-
-                    {msg && <div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 animate-fade-up">{msg}</div>}
-                    {err && <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 animate-shake">⚠ {err}</div>}
-                  </>
-                )}
-              </div>
-
-              {/* Booking notifications ---------------------------------------- */}
-              <div className="text-[10px] uppercase tracking-wider text-mute font-semibold mt-6 mb-2 animate-fade-up">Booking notifications</div>
-              <div className="form-card animate-fade-up border-lime-200 dark:border-lime-500/30 transition duration-300 ease-out hover:shadow-md">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-slate-100">
-                      {selected.agentName || selected.label || 'Unnamed agent'}
-                    </div>
-                    <div className="text-xs text-mute mt-0.5">
-                      <span className="font-mono">{selected.value}</span>
-                      {selected.agentSlug && <> · {selected.agentSlug}</>}
-                    </div>
-                  </div>
-                  <Toggle on={notifOn} onChange={setNotifOn} />
+                      {msg && <div className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 animate-fade-up">{msg}</div>}
+                      {err && <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 animate-shake">⚠ {err}</div>}
+                    </>
+                  )}
                 </div>
 
-                {notifOn && (
-                  <>
-                    <div className="mt-4">
-                      <label className="field-label">Notification email</label>
-                      <input
-                        className="input transition duration-200 ease-out focus:shadow-md"
-                        type="email"
-                        value={notifEmail}
-                        onChange={(e) => { setNotifEmail(e.target.value); setNotifMsg(''); }}
-                        placeholder="your@email.com"
-                      />
+                {/* Booking notifications -------------------------------------- */}
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-mute font-semibold mt-6 mb-2 animate-fade-up">
+                  <BellRing size={12} /> Booking notifications
+                </div>
+                <div className="form-card animate-fade-up border-blue-500/30 transition duration-300 ease-out hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-bold text-[var(--foreground)]">
+                        {selected.agentName || selected.label || 'Unnamed agent'}
+                      </div>
+                      <div className="text-xs text-mute mt-0.5">
+                        <span className="font-mono">{selected.value}</span>
+                        {selected.agentSlug && <> · {selected.agentSlug}</>}
+                      </div>
                     </div>
-                    <p className="text-[11px] text-mute mt-1">
-                      {notifEmail.trim()
-                        ? 'Owner will get a copy when meetings are booked.'
-                        : 'No notification target set — owner won’t receive a copy when meetings are booked.'}
-                    </p>
-                    <div className="mt-3">
-                      <button
-                        className="btn-teal transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-90"
-                        onClick={saveNotification}
-                        disabled={!notifEmail.trim()}
-                      >
-                        Save notification
-                      </button>
-                    </div>
-                    {notifMsg && <div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 animate-fade-up">{notifMsg}</div>}
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </>
+                    <Toggle on={notifOn} onChange={setNotifOn} />
+                  </div>
+
+                  {notifOn && (
+                    <>
+                      <div className="mt-4">
+                        <label className="field-label">Notification email</label>
+                        <input
+                          className="input transition duration-200 ease-out focus:shadow-md"
+                          type="email"
+                          value={notifEmail}
+                          onChange={(e) => { setNotifEmail(e.target.value); setNotifMsg(''); }}
+                          placeholder="your@email.com"
+                        />
+                      </div>
+                      <p className="text-[11px] text-mute mt-1">
+                        {notifEmail.trim()
+                          ? 'Owner will get a copy when meetings are booked.'
+                          : 'No notification target set — owner won’t receive a copy when meetings are booked.'}
+                      </p>
+                      <div className="mt-3">
+                        <button
+                          className="btn-teal transition duration-200 ease-out hover:scale-105 active:scale-95 disabled:opacity-90"
+                          onClick={saveNotification}
+                          disabled={!notifEmail.trim()}
+                        >
+                          Save notification
+                        </button>
+                      </div>
+                      {notifMsg && <div className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 animate-fade-up">{notifMsg}</div>}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Save-confirmation modal — explains the 2-minute propagation window
