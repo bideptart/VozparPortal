@@ -201,7 +201,7 @@ export default function PricingSection({ onSelectPlan }) {
                     : 'border-[var(--border)] bg-[var(--card)]'
                 }`}
               >
-                <CardHeader className="space-y-5 pb-5">
+                <CardHeader className="space-y-4 pb-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
@@ -216,9 +216,9 @@ export default function PricingSection({ onSelectPlan }) {
                     ) : null}
                   </div>
 
-                  <p className="min-h-[72px] text-sm leading-6 text-[var(--body)]">{plan.description}</p>
+                  <p className="text-sm leading-6 text-[var(--body)]">{plan.description}</p>
 
-                  <div className="flex items-end gap-1 text-[var(--foreground)]">
+                  <div className="pt-1 flex items-end gap-1 text-[var(--foreground)]">
                     <span className="pb-1 text-xl font-semibold">$</span>
                     <span className="text-5xl font-semibold leading-none">
                       <NumberFlow value={displayPrice} />
