@@ -8,6 +8,25 @@ const fmtDateTime = (iso) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-US');
 };
 
+const hoursAgo = (n) => new Date(Date.now() - n * 3600000).toISOString();
+
+// Shown only when the real purchase list comes back genuinely empty — same
+// "never overrides real data" rule as the admin surface's demo fallbacks.
+const DEMO_PURCHASES = [
+  { id: 'demo-1', createdAt: hoursAgo(3),   customer: { company: 'Northwind Traders', name: 'Priya Shah', email: 'priya@northwind.example' }, kind: 'new-number-plan', description: 'Growth plan + new DID', amount: 93,  status: 'succeeded' },
+  { id: 'demo-2', createdAt: hoursAgo(30),  customer: { company: 'Bluepeak Studio',   name: 'Owen Clarke', email: 'owen@bluepeak.example' },   kind: 'topup',           description: 'Wallet top-up',         amount: 50,  status: 'succeeded' },
+  { id: 'demo-3', createdAt: hoursAgo(75),  customer: { company: 'Larkspur Dental',   name: 'Maria Gomez', email: 'maria@larkspur.example' },  kind: 'plan-change',     description: 'Upgraded Starter → Scale', amount: 285, status: 'succeeded' },
+  { id: 'demo-4', createdAt: hoursAgo(140), customer: { company: 'Fernhill Logistics', name: 'Jack Turner', email: 'jack@fernhill.example' },   kind: 'plan-restart',    description: 'Plan restart after pause', amount: 0,   status: 'pending' },
+  { id: 'demo-5', createdAt: hoursAgo(200), customer: { company: 'Larkspur Dental',   name: 'Maria Gomez', email: 'maria@larkspur.example' },  kind: 'signup',          description: 'New signup via portal', amount: 0,   status: 'succeeded' },
+];
+const DEMO_TOTALS = [
+  { kind: 'new-number-plan', count: 1, sum: 93 },
+  { kind: 'topup',           count: 1, sum: 50 },
+  { kind: 'plan-change',     count: 1, sum: 285 },
+  { kind: 'plan-restart',    count: 1, sum: 0 },
+  { kind: 'signup',          count: 1, sum: 0 },
+];
+
 // Symbol for the reseller's storefront currency. Falls back to $ when the
 // field isn't populated (legacy resellers).
 const symbolFor = (cur) => (cur === 'USD' ? '$' : cur === 'USD' ? '$' : `${cur || '$'} `);
@@ -56,14 +75,21 @@ export default function Purchases() {
       setTotals(r.totals || []);
     } catch (e) {
       setErr(e.message);
+      setList((prev) => prev ?? []);
     }
   };
   useEffect(() => { load(); }, []);
 
+  // Falls back to demo purchases only when the real list comes back
+  // genuinely empty — never overrides real data.
+  const usingDemo = list !== null && list.length === 0;
+  const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_PURCHASES);
+  const effectiveTotals = list !== null && list.length === 0 && totals.length === 0 ? DEMO_TOTALS : totals;
+
   const filtered = useMemo(() => {
-    if (!list) return [];
+    if (!effectiveList) return [];
     const q = search.trim().toLowerCase();
-    return list.filter((p) => {
+    return effectiveList.filter((p) => {
       if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
       if (!q) return true;
       return (
@@ -73,13 +99,13 @@ export default function Purchases() {
         (p.description      || '').toLowerCase().includes(q)
       );
     });
-  }, [list, search, kindFilter]);
+  }, [effectiveList, search, kindFilter]);
 
   // Roll-up of grand totals from the server-side aggregation.
-  const sumAll  = totals.reduce((a, t) => a + (t.sum || 0), 0);
-  const countAll = totals.reduce((a, t) => a + (t.count || 0), 0);
-  const newPlanRow = totals.find((t) => t.kind === 'new-number-plan');
-  const topupRow   = totals.find((t) => t.kind === 'topup');
+  const sumAll  = effectiveTotals.reduce((a, t) => a + (t.sum || 0), 0);
+  const countAll = effectiveTotals.reduce((a, t) => a + (t.count || 0), 0);
+  const newPlanRow = effectiveTotals.find((t) => t.kind === 'new-number-plan');
+  const topupRow   = effectiveTotals.find((t) => t.kind === 'topup');
 
   return (
     <div>
@@ -90,6 +116,7 @@ export default function Purchases() {
             Every plan buy, change, restart, and wallet top-up made by a customer
             in your portal.
           </p>
+          {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
         </div>
         <button className="btn-ghost text-sm" onClick={load}>↻ Refresh</button>
       </div>
@@ -104,7 +131,7 @@ export default function Purchases() {
       <div className="mt-6 grid sm:grid-cols-4 gap-3">
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total transactions</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{list === null ? '—' : countAll}</div>
+          <div className="mt-1 text-2xl font-bold text-slate-900">{effectiveList === null ? '—' : countAll}</div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total volume</div>
@@ -140,7 +167,7 @@ export default function Purchases() {
           onChange={(e) => setKindFilter(e.target.value)}
         >
           <option value="all">All transaction kinds</option>
-          {totals.map((t) => (
+          {effectiveTotals.map((t) => (
             <option key={t.kind} value={t.kind}>{kindMeta(t.kind).label} ({t.count})</option>
           ))}
         </select>
@@ -160,12 +187,12 @@ export default function Purchases() {
             </tr>
           </thead>
           <tbody>
-            {list === null && (
+            {effectiveList === null && (
               <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>
             )}
-            {list && filtered.length === 0 && (
+            {effectiveList && filtered.length === 0 && (
               <tr><td colSpan={6} className="text-center text-mute py-6">
-                {list.length === 0
+                {effectiveList.length === 0
                   ? 'No purchases yet — they\'ll show up as soon as a customer signs up or upgrades.'
                   : 'No transactions match the current filter.'}
               </td></tr>

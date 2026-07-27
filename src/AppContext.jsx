@@ -30,6 +30,22 @@ const DEMO_USER = {
   company: 'Vozper Demo',
 };
 
+// Frontend-only reseller demo — same idea as DEMO_USER, but typed for the
+// reseller portal (My customers / Purchases / Plans / Sub-resellers). Backed
+// by the demo-fallback data baked into each reseller page, since there's no
+// live /api/reseller/* backend for this to hit.
+const DEMO_RESELLER_USER = {
+  id: 901,
+  name: 'Demo Reseller',
+  email: 'reseller@vozpar.com',
+  username: 'reseller',
+  userType: 'reseller',
+  role: 'customer',
+  company: 'Vozpar Demo Reseller',
+  resellerPortal: 'demo.vozper.io',
+  displayCurrency: 'USD',
+};
+
 const emptySignup = () => ({
   plan: null, planAmount: 0, planMin: 0, planRate: 0, planAgents: 0, planLabel: '',
   planCycle: 'monthly',
@@ -84,10 +100,13 @@ export function AppProvider({ children }) {
         setCurrentUser(user);
         writeBootCache(t, user);
       } catch {
-        // If API fails and we're in demo mode, use demo user
+        // If API fails and we're in demo mode, use whichever demo identity
+        // is cached for this token (admin vs reseller demo) — falling back
+        // to DEMO_USER only when nothing was cached for it.
         if (demoMode) {
-          setCurrentUser(DEMO_USER);
-          writeBootCache(t, DEMO_USER);
+          const cachedUser = readBootCache(t) || DEMO_USER;
+          setCurrentUser(cachedUser);
+          writeBootCache(t, cachedUser);
         } else {
           setToken('');
           clearBootCache();
@@ -131,6 +150,19 @@ export function AppProvider({ children }) {
   );
 
   const signinUser = async ({ identifier, password }) => {
+    // Reseller portal demo login — frontend-only, no backend required.
+    if ((identifier.toLowerCase() === 'reseller@vozpar.com' || identifier.toLowerCase() === 'reseller') && password === 'reseller123') {
+      const resellerToken = 'reseller-demo-token';
+      setDemoMode(true);
+      sessionStorage.setItem('vozper.demoMode', 'true');
+      setToken(resellerToken);
+      setCurrentUser(DEMO_RESELLER_USER);
+      writeBootCache(resellerToken, DEMO_RESELLER_USER);
+      setAuthError('');
+      navigate('/reseller/customers', { replace: true });
+      return true;
+    }
+
     // Check if it's our custom user
     if ((identifier.toLowerCase() === 'sushil@mcmbpo.com' || identifier.toLowerCase() === 'sushil') && password === '92789278') {
       const customUser = {

@@ -9,6 +9,16 @@ const fmtDate = (iso) => {
 
 const BRAND_GRADIENT = 'bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]';
 
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
+// Shown only when the real sub-reseller list comes back genuinely empty —
+// same "never overrides real data" rule as the admin surface's demo
+// fallbacks.
+const DEMO_SUB_RESELLERS = [
+  { id: 'demo-1', company: 'Acme Voice Partners', name: 'Jane Acme', email: 'ops@acme.example', username: 'acme', resellerPortal: 'acme-voice.io', phone: '+1 415 555 0100', customerCount: 6, kycLocation: 'Austin, US', createdAt: daysAgo(60) },
+  { id: 'demo-2', company: 'Northstar Comms',     name: 'Devon Lee', email: 'devon@northstar.example', username: 'northstar', resellerPortal: 'northstar.io', phone: '+1 646 555 0121', customerCount: 0, kycLocation: 'Toronto, CA', createdAt: daysAgo(12) },
+];
+
 const emptyForm = () => ({
   name: '', company: '', email: '', phone: '',
   username: '', password: '',
@@ -38,16 +48,37 @@ export default function SubResellers() {
       setList(r.subResellers || []);
     } catch (e) {
       setErr(e.message);
+      setList((prev) => prev ?? []);
     }
   };
 
   useEffect(() => { load(); }, []);
+
+  // Falls back to demo sub-resellers only when the real list comes back
+  // genuinely empty — never overrides real data.
+  const usingDemo = list !== null && list.length === 0;
+  const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_SUB_RESELLERS);
 
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e) => {
     e.preventDefault();
     setFormErr(''); setBusy(true);
+    // Demo rows aren't a real account tree — add the row locally instead of
+    // hitting a backend that isn't there.
+    if (usingDemo) {
+      const newRow = {
+        id: `demo-${Date.now()}`, company: form.company, name: form.name, email: form.email,
+        username: form.username, resellerPortal: form.resellerPortal, phone: form.phone,
+        customerCount: 0, kycLocation: form.kycLocation, createdAt: new Date().toISOString(),
+      };
+      setList((cur) => [...(cur && cur.length ? cur : DEMO_SUB_RESELLERS), newRow]);
+      setCreatedMsg(`✓ Created ${form.email} (portal: ${form.resellerPortal}) (demo)`);
+      setForm(emptyForm());
+      setShowForm(false);
+      setBusy(false);
+      return;
+    }
     try {
       const r = await api('/api/reseller/sub-resellers', { method: 'POST', body: form });
       setCreatedMsg(`✓ Created ${r.subReseller.email} (portal: ${r.subReseller.resellerPortal})`);
@@ -70,6 +101,7 @@ export default function SubResellers() {
             On-board partners under your brand. Each sub-reseller gets their own
             portal slug and customer list — all rolled up to your downstream.
           </p>
+          {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
         </div>
         <button
           onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
@@ -198,13 +230,8 @@ export default function SubResellers() {
             </tr>
           </thead>
           <tbody>
-            {list === null && <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>}
-            {list?.length === 0 && (
-              <tr><td colSpan={6} className="text-center text-mute py-6">
-                No sub-resellers yet — click <strong>+ Add sub-reseller</strong> above to on-board your first partner.
-              </td></tr>
-            )}
-            {(list || []).map((r) => (
+            {effectiveList === null && <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>}
+            {(effectiveList || []).map((r) => (
               <tr key={r.id}>
                 <td>
                   <div className="font-medium">{r.company || r.name}</div>

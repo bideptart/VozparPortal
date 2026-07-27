@@ -8,6 +8,23 @@ const fmtDate = (iso) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+
+// Shown only when the real customer list comes back genuinely empty — same
+// "never overrides real data" rule as the admin surface's demo fallbacks.
+const DEMO_CUSTOMERS = [
+  { id: 'demo-1', company: 'Northwind Traders', name: 'Priya Shah', email: 'priya@northwind.example', createdAt: daysAgo(21), numberCount: 1,
+    numbers: [{ id: 'd1', value: '+1 415 555 0142', isPrimary: true, planCycle: 'monthly', plan: { label: 'Growth', amount: 93, min: 800 } }], minutesUsed: 512 },
+  { id: 'demo-2', company: 'Bluepeak Studio', name: 'Owen Clarke', email: 'owen@bluepeak.example', createdAt: daysAgo(15), numberCount: 1,
+    numbers: [{ id: 'd2', value: '+1 212 555 0198', isPrimary: true, planCycle: 'yearly', plan: { label: 'Starter', amount: 31, min: 250 } }], minutesUsed: 84 },
+  { id: 'demo-3', company: 'Larkspur Dental', name: 'Maria Gomez', email: 'maria@larkspur.example', createdAt: daysAgo(9), numberCount: 2,
+    numbers: [
+      { id: 'd3a', value: '+1 646 555 0110', isPrimary: true,  planCycle: 'monthly', plan: { label: 'Scale', amount: 316, min: 3000 } },
+      { id: 'd3b', value: '+1 646 555 0111', isPrimary: false, planCycle: 'monthly', plan: { label: 'Starter', amount: 31, min: 250 } },
+    ], minutesUsed: 2140 },
+  { id: 'demo-4', company: 'Fernhill Logistics', name: 'Jack Turner', email: 'jack@fernhill.example', createdAt: daysAgo(3), numberCount: 0, numbers: [], minutesUsed: 0 },
+];
+
 // Resolve the symbol + format for the reseller's storefront currency.
 // 9278.ai reseller bills in $; 9278.ai reseller bills in $.
 const symbolFor = (cur) => (cur === 'USD' ? '$' : cur === 'USD' ? '$' : `${cur || '$'} `);
@@ -58,14 +75,20 @@ export default function Customers() {
       setList(r.customers || []);
     } catch (e) {
       setErr(e.message);
+      setList((prev) => prev ?? []);
     }
   };
 
   useEffect(() => { load(); }, []);
 
+  // Falls back to demo customers only when the real list comes back
+  // genuinely empty — never overrides real data.
+  const usingDemo = list !== null && list.length === 0;
+  const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_CUSTOMERS);
+
   const totalDids = useMemo(
-    () => (list || []).reduce((a, c) => a + didsFor(c).length, 0),
-    [list],
+    () => (effectiveList || []).reduce((a, c) => a + didsFor(c).length, 0),
+    [effectiveList],
   );
 
   return (
@@ -76,6 +99,7 @@ export default function Customers() {
           <p className="text-mute text-sm mt-1">
             Every account that signed up through your portal — with every plan and number they bought.
           </p>
+          {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
         </div>
         <button className="btn-ghost text-sm" onClick={load}>↻ Refresh</button>
       </div>
@@ -90,19 +114,19 @@ export default function Customers() {
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Total customers</div>
           <div className="mt-1 text-2xl font-bold text-slate-900">
-            {list === null ? '—' : list.length}
+            {effectiveList === null ? '—' : effectiveList.length}
           </div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Numbers provisioned</div>
           <div className="mt-1 text-2xl font-bold text-slate-900">
-            {list === null ? '—' : list.reduce((a, c) => a + (c.numberCount || 0), 0)}
+            {effectiveList === null ? '—' : effectiveList.reduce((a, c) => a + (c.numberCount || 0), 0)}
           </div>
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Plans sold</div>
           <div className="mt-1 text-2xl font-bold text-primary">
-            {list === null ? '—' : totalDids}
+            {effectiveList === null ? '—' : totalDids}
           </div>
         </div>
       </div>
@@ -120,15 +144,10 @@ export default function Customers() {
             </tr>
           </thead>
           <tbody>
-            {list === null && (
+            {effectiveList === null && (
               <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>
             )}
-            {list?.length === 0 && (
-              <tr><td colSpan={6} className="text-center text-mute py-6">
-                No customers yet. Customers signing up at <strong className="font-mono">your portal slug</strong> will appear here automatically.
-              </td></tr>
-            )}
-            {(list || []).flatMap((c) => {
+            {(effectiveList || []).flatMap((c) => {
               const dids = didsFor(c);
               if (dids.length === 0) {
                 return [(
