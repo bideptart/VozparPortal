@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS pending_signups (
   consumed_at        TIMESTAMPTZ,
   resulting_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   stripe_session_id  TEXT,
-  expires_at         TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '1 day'),
+  expires_at         TIMESTAMPTZ NOT NULL DEFAULT (datetime('now', '+1 day')),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

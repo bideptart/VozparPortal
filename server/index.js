@@ -215,8 +215,8 @@ const auth = async (req, res, next) => {
     r = await q(
       `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token = $1
-         AND s.expires_at > NOW()
-         AND s.created_at >= COALESCE(u.password_changed_at, 'epoch'::timestamptz)`,
+         AND s.expires_at > CURRENT_TIMESTAMP
+         AND s.created_at >= COALESCE(u.password_changed_at, '1970-01-01T00:00:00.000Z')`,
       [token],
     );
   } catch (e) {
@@ -233,9 +233,9 @@ const auth = async (req, res, next) => {
   // idle window on the first request after deploy.
   q(
     `UPDATE sessions
-        SET expires_at = NOW() + ($2 || ' minutes')::INTERVAL
+        SET expires_at = datetime('now', '+' || $2 || ' minutes')
       WHERE token = $1
-        AND ABS(EXTRACT(EPOCH FROM (expires_at - (NOW() + ($2 || ' minutes')::INTERVAL)))) > 60`,
+        AND ABS(strftime('%s', expires_at) - strftime('%s', datetime('now', '+' || $2 || ' minutes'))) > 60`,
     [token, SESSION_IDLE_MIN],
   ).catch((e) => console.warn('[auth] session slide failed:', e.message));
   next();
@@ -349,24 +349,19 @@ const runMigrations = async () => {
   // (enforced by a trigger so direct SQL updates also flip it). The auth
   // middleware rejects any session created strictly before this timestamp,
   // forcing already-logged-in clients to sign in again.
-  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+  // SQLite triggers can't reassign NEW.* the way plpgsql can, so this is an
+  // AFTER trigger that issues a follow-up UPDATE instead of a BEFORE trigger
+  // mutating the row in place. The password-change route also sets this
+  // column explicitly (belt and suspenders for any direct SQL update).
   await q(`
-    CREATE OR REPLACE FUNCTION bump_password_changed_at()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      IF NEW.password_hash IS DISTINCT FROM OLD.password_hash THEN
-        NEW.password_changed_at = NOW();
-      END IF;
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-  `);
-  await q(`DROP TRIGGER IF EXISTS trg_bump_password_changed_at ON users`);
-  await q(`
-    CREATE TRIGGER trg_bump_password_changed_at
-      BEFORE UPDATE ON users
+    CREATE TRIGGER IF NOT EXISTS trg_bump_password_changed_at
+      AFTER UPDATE OF password_hash ON users
       FOR EACH ROW
-      EXECUTE FUNCTION bump_password_changed_at()
+      WHEN NEW.password_hash IS NOT OLD.password_hash
+    BEGIN
+      UPDATE users SET password_changed_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END
   `);
 
   // Monthly-vs-yearly billing cadence stamped on the user row at signup time.
@@ -429,50 +424,13 @@ const runMigrations = async () => {
        AND user_type <> 'superadmin'
   `);
 
-  // === Default-reseller trigger ==========================================
-  // Every NEW user row that comes in as a regular customer (user_type is
-  // 'user' OR null) WITHOUT an explicit reseller_id gets auto-attributed
-  // to the canonical 9278.ai reseller. Applies BEFORE INSERT, so the value
-  // is set even if direct SQL skips the application layer.
-  //
-  // Rows being created as 'reseller', 'admin', or 'superadmin' are left
-  // alone — those tiers belong above any reseller in the hierarchy.
-  await q(`
-    CREATE OR REPLACE FUNCTION set_default_reseller_id()
-    RETURNS TRIGGER AS $$
-    DECLARE
-      default_reseller_id INTEGER;
-    BEGIN
-      -- Only act on customer-tier rows that have no reseller_id yet.
-      IF NEW.reseller_id IS NULL
-         AND (NEW.user_type IS NULL OR NEW.user_type = 'user') THEN
-
-        SELECT id INTO default_reseller_id
-          FROM users
-         WHERE user_type = 'reseller'
-           AND LOWER(reseller_portal) = '${RESELLER_PORTAL_SQL}'
-         LIMIT 1;
-
-        IF default_reseller_id IS NOT NULL THEN
-          NEW.reseller_id := default_reseller_id;
-        END IF;
-
-        -- Also defensively set user_type if the inserter omitted it.
-        IF NEW.user_type IS NULL THEN
-          NEW.user_type := 'user';
-        END IF;
-      END IF;
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-  `);
-  await q(`DROP TRIGGER IF EXISTS trg_set_default_reseller_id ON users`);
-  await q(`
-    CREATE TRIGGER trg_set_default_reseller_id
-      BEFORE INSERT ON users
-      FOR EACH ROW
-      EXECUTE FUNCTION set_default_reseller_id()
-  `);
+  // === Default-reseller backfill ==========================================
+  // SQLite triggers can't reassign NEW.* the way the old plpgsql BEFORE
+  // INSERT trigger did (and RETURNING * needs the value visible immediately,
+  // which an AFTER trigger can't guarantee) — so this is resolved in JS at
+  // the one call site that used to depend on the trigger's implicit default
+  // (the admin-created-customer path in POST /api/signup). Every other
+  // INSERT INTO users already computes reseller_id explicitly.
 
   // Backfill: any existing 'user' row with no reseller_id and not the
   // intentionally-unattached voice@9278.ai row gets the same default.
@@ -558,10 +516,10 @@ const runMigrations = async () => {
     UPDATE users
        SET plan_activated_at = COALESCE(plan_activated_at, created_at),
            plan_expires_at   = COALESCE(plan_expires_at,
-                                        created_at + (CASE plan_cycle
-                                                        WHEN 'yearly' THEN INTERVAL '365 days'
-                                                        ELSE                INTERVAL '30 days'
-                                                      END)),
+                                        CASE plan_cycle
+                                          WHEN 'yearly' THEN datetime(created_at, '+365 days')
+                                          ELSE                datetime(created_at, '+30 days')
+                                        END),
            updated_at = NOW()
      WHERE role = 'customer'
        AND plan_label IS NOT NULL
@@ -815,16 +773,27 @@ app.post('/api/signup', auth, async (req, res) => {
   if (dup.rowCount) return res.status(409).json({ error: 'Email or username already exists' });
 
   const hash = await bcrypt.hash(b.password, 10);
+  // Attribute this customer to the canonical default reseller (see the
+  // "Default-reseller backfill" note in runMigrations) — used to compute
+  // this via a BEFORE INSERT trigger; SQLite can't do that, so it's resolved
+  // here instead.
+  const defaultReseller = await q(
+    `SELECT id FROM users WHERE user_type = 'reseller' AND LOWER(reseller_portal) = LOWER($1) LIMIT 1`,
+    [RESELLER_PORTAL],
+  );
+  const defaultResellerId = defaultReseller.rows[0]?.id || null;
   const ins = await q(
     `INSERT INTO users
        (name, company, username, email, phone, password_hash, role,
         plan_label, plan_amount, plan_min, plan_rate, plan_agents,
         number_value, number_loc, number_price,
-        voice, agent_name, greeting, prompt, kb_company, kb_faqs)
+        voice, agent_name, greeting, prompt, kb_company, kb_faqs,
+        user_type, reseller_id)
      VALUES ($1,$2,$3,$4,$5,$6,'customer',
              $7,$8,$9,$10,$11,
              $12,$13,$14,
-             $15,$16,$17,$18,$19,$20)
+             $15,$16,$17,$18,$19,$20,
+             'user',$21)
      RETURNING *`,
     [
       b.name.trim(), b.company.trim(), b.username.trim(), b.email.trim(), (b.phone || '').trim(), hash,
@@ -832,6 +801,7 @@ app.post('/api/signup', auth, async (req, res) => {
       b.number || null, b.numberLoc || null, b.numberPrice || 0,
       b.voice || null, b.agentName || null, b.greeting || null, b.prompt || null,
       b.kbCompany || null, b.kbFaqs || null,
+      defaultResellerId,
     ],
   );
   const user = ins.rows[0];
@@ -869,7 +839,7 @@ app.post('/api/signup', auth, async (req, res) => {
   const token = newToken();
   await q(
     `INSERT INTO sessions (token, user_id, expires_at)
-     VALUES ($1, $2, NOW() + ($3 || ' days')::INTERVAL)`,
+     VALUES ($1, $2, datetime('now', '+' || $3 || ' days'))`,
     [token, user.id, SESSION_DAYS],
   );
   res.json({ token, user: publicUser(user) });
@@ -992,7 +962,7 @@ async function finalizeSignupFromRazorpay({ pendingToken, payment }) {
       const authToken = newToken();
       await q(
         `INSERT INTO sessions (token, user_id, expires_at)
-         VALUES ($1, $2, NOW() + ($3 || ' days')::INTERVAL)`,
+         VALUES ($1, $2, datetime('now', '+' || $3 || ' days'))`,
         [authToken, ur.rows[0].id, SESSION_DAYS],
       );
       return { user: ur.rows[0], authToken, alreadyConsumed: true };
@@ -1047,7 +1017,7 @@ async function finalizeSignupFromRazorpay({ pendingToken, payment }) {
      ) VALUES (
        $1,$2,$3,$4,$5,$6,'customer',
        $7,$8,$9,$10,$11,$12,
-       NOW(), NOW() + ($13)::INTERVAL,
+       CURRENT_TIMESTAMP, datetime('now', '+' || $13),
        $14,$15,$16,
        $17,$18,$19,$20,$21,$22,$23,
        $24,'user',$25
@@ -1095,7 +1065,7 @@ async function finalizeSignupFromRazorpay({ pendingToken, payment }) {
   const authToken = newToken();
   await q(
     `INSERT INTO sessions (token, user_id, expires_at)
-     VALUES ($1, $2, NOW() + ($3 || ' days')::INTERVAL)`,
+     VALUES ($1, $2, datetime('now', '+' || $3 || ' days'))`,
     [authToken, user.id, SESSION_DAYS],
   );
   return { user, authToken, alreadyConsumed: false };
@@ -2092,7 +2062,7 @@ app.post('/api/signin', async (req, res) => {
   try {
     await q(
       `INSERT INTO sessions (token, user_id, expires_at)
-       VALUES ($1, $2, NOW() + ($3 || ' days')::INTERVAL)`,
+       VALUES ($1, $2, datetime('now', '+' || $3 || ' days'))`,
       [token, user.id, SESSION_DAYS],
     );
   } catch (e) {
@@ -3369,8 +3339,8 @@ app.get('/api/admin/stats', auth, requireAdmin, async (_req, res) => {
     `SELECT
        COUNT(*) FILTER (WHERE role = 'customer')::int AS customers,
        COUNT(*) FILTER (WHERE role = 'admin')::int AS admins,
-       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS last_24h,
-       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int AS last_7d,
+       COUNT(*) FILTER (WHERE created_at > datetime('now', '-24 hours'))::int AS last_24h,
+       COUNT(*) FILTER (WHERE created_at > datetime('now', '-7 days'))::int AS last_7d,
        COALESCE(SUM(plan_amount) FILTER (WHERE role = 'customer'), 0)::numeric AS mrr_plan,
        COALESCE(SUM(number_price) FILTER (WHERE role = 'customer' AND number_value IS NOT NULL), 0)::numeric AS mrr_number
      FROM users`,
