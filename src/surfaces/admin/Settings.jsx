@@ -201,7 +201,7 @@ export default function Settings() {
           <li>• <strong>Override</strong> — value lives in the <code>settings</code> table; takes precedence over <code>.env</code>.</li>
           <li>• <strong>From .env</strong> — value comes from the server's <code>.env</code> file; no DB override.</li>
           <li>• Secrets are stored as plain text in DB — make sure DB access is restricted (it is: only Postgres user <code>postgres</code> can read).</li>
-          <li>• Settings flagged with ⚠ require a server restart because their SDK client (Stripe, MCP) is constructed at boot.</li>
+          <li>• Settings flagged with ⚠ require a server restart because their SDK client (Stripe) is constructed at boot.</li>
         </ul>
       </div>
     </div>

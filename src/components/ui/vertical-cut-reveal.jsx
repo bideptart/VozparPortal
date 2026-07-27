@@ -62,6 +62,7 @@ export default function VerticalCutReveal({
               word={item.word}
               duration={duration}
               splitBy={splitBy}
+              isLast={item.id === animatedWords.length - 1}
             />
           ))}
         </motion.span>
@@ -70,9 +71,14 @@ export default function VerticalCutReveal({
   );
 }
 
-function Word({ word, duration, splitBy }) {
+function Word({ word, duration, splitBy, isLast }) {
   return (
-    <span className="inline-block overflow-hidden pt-1 pb-0.5">
+    <span
+      className={cn(
+        "inline-block overflow-hidden pt-1 pb-0.5",
+        splitBy === "words" && !isLast && "mr-[0.25em]",
+      )}
+    >
       <motion.span
         className="inline-block"
         variants={{
@@ -88,7 +94,6 @@ function Word({ word, duration, splitBy }) {
         }}
       >
         {word}
-        {splitBy === "words" && " "}
       </motion.span>
     </span>
   );

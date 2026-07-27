@@ -40,7 +40,9 @@ export default function Reseller() {
   // A sub-reseller hitting /reseller/sub-resellers directly is bounced home.
   if (!VALID.has(tab)) return <Navigate to="/reseller/customers" replace />;
 
-  const activeLabel = TABS.find((t) => t.id === tab)?.label;
+  const activeTab = TABS.find((t) => t.id === tab);
+  const activeLabel = activeTab?.label;
+  const ActiveIcon = activeTab?.Icon;
 
   return (
     <div className="dashboard-shell">
@@ -49,23 +51,22 @@ export default function Reseller() {
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
         <Link
           to="/reseller/customers"
-          className="h-16 flex items-center gap-2 px-4 bg-white sticky top-0 z-30"
+          className="h-16 flex items-center gap-2 px-4 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]"
           aria-label="kallus.io home"
         >
-          <Logo size={44} showWordmark={false} />
-          <span className="font-mono text-sm lowercase text-mute tracking-tight">kallus.io</span>
+          <Logo size={32} />
         </Link>
 
         <div className="sidenav-scroll">
-          <div className="px-4 pt-3 pb-2 border-b border-slate-100">
+          <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
             <div className="text-[10px] uppercase tracking-wider text-mute font-semibold">
               Reseller
             </div>
-            <div className="mt-0.5 text-sm font-semibold text-slate-900 truncate">
+            <div className="mt-0.5 text-sm font-semibold text-[var(--foreground)] truncate">
               {currentUser.company || currentUser.name}
             </div>
             {currentUser.resellerPortal && (
-              <div className="mt-0.5 text-[11px] font-mono text-lime-600 truncate">
+              <div className="mt-0.5 text-[11px] font-mono text-lime-400 truncate">
                 {currentUser.resellerPortal}
               </div>
             )}
@@ -82,16 +83,16 @@ export default function Reseller() {
             </Link>
           ))}
 
-          <div className="mt-2 pt-2 border-t border-slate-100">
+          <div className="mt-2 pt-2 border-t border-[var(--border)]">
             <button type="button" onClick={signoutUser} className="nav-group-toggle">
-              <LogOut size={16} strokeWidth={2} /> Log out
+              Log out <LogOut size={16} strokeWidth={2} />
             </button>
           </div>
         </div>
       </aside>
 
       <div className="dashboard-main">
-        <div className="sticky top-0 z-30 bg-white -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-slate-200 mb-6">
+        <div className="sticky top-0 z-30 bg-[var(--popover)] -mt-5 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 border-b border-[var(--border)] mb-6">
           <button
             className="mobile-nav-toggle lg:hidden"
             onClick={() => setNavOpen(true)}
@@ -99,8 +100,15 @@ export default function Reseller() {
           >
             <Menu size={16} /> Menu
           </button>
-          <div className="lg:hidden text-xs text-mute font-semibold uppercase tracking-wider truncate">
-            {activeLabel}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            {ActiveIcon && (
+              <span className="flex w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
+                <ActiveIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />
+              </span>
+            )}
+            <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-mute lg:text-[var(--foreground)] truncate">
+              {activeLabel}
+            </h1>
           </div>
         </div>
 

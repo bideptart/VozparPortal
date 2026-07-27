@@ -5,16 +5,13 @@ import {
   FileText, CreditCard, Receipt, User, Menu, Wrench, Ticket, DoorOpen, Tag,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
-// AddNumberModal is used directly by this file's own "+ Add plan / number"
-// button on every tab, so Numbers.jsx is loaded eagerly either way — no
-// point lazy-wrapping its default export too.
 import Logo from '../../components/Logo.jsx';
 import Footer from '../../components/Footer.jsx';
 import BookingIcon from '../../components/BookingIcon.jsx';
 
 // Lazy load Numbers to avoid crashing on API failures in demo mode
 const NumbersLazy = lazy(() => import('./Numbers.jsx'));
-const AddNumberModalLazy = lazy(() => import('./Numbers.jsx').then(m => ({ default: m.AddNumberModal })));
+const AddNumberModalLazy = lazy(() => import('./Numbers.jsx').then((module) => ({ default: module.AddNumberModal })));
 
 // Every tab body is its own chunk — a visitor on Overview never downloads
 // Billing/Templates/Playground code, and vice versa.
@@ -139,8 +136,7 @@ export default function Customer() {
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
         <div className="h-16 flex items-center gap-1.5 px-3 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]">
           <Link to="/dashboard/overview" className="flex items-center gap-2 min-w-0" aria-label="vozper.com home">
-            <Logo size={36} showWordmark={false} white />
-            <span className="font-mono text-sm lowercase text-[var(--body)] tracking-tight whitespace-nowrap">vozper.com</span>
+            <Logo size={32} />
           </Link>
           <button
             type="button"
@@ -219,7 +215,7 @@ export default function Customer() {
 
           <div className="mt-2 pt-2 border-t border-[var(--border)]">
             <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
-              <DoorOpen size={16} strokeWidth={2} /> Log out
+              Log out <DoorOpen size={16} strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -254,20 +250,15 @@ export default function Customer() {
           )}
           {/* Page icon + title, sourced from the same TABS entry that drives
               the sidebar — was previously duplicated as a big heading inside
-              every page component; lives once, here, for every tab now.
-              One <h1> in the DOM at every width (not two elements toggled by
-              visibility — that would leave zero h1s on mobile). Below `lg`
-              the "Menu" button plus the right-side actions leave very little
-              room, so the icon shrinks to inline and the title drops back to
-              the small uppercase label the mobile header always used. */}
-          <div className="lg:flex-1 flex items-center gap-1.5 lg:gap-2.5 lg:min-w-0">
+              every page component; lives once, here, for every tab now. One
+              badge + one <h1>, always rendered (no breakpoint toggling
+              between two icon variants) so the icon is never conditionally
+              missing at any width. */}
+          <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-2.5">
             {active.Icon && (
-              <>
-                <active.Icon size={14} strokeWidth={2} className="lg:hidden shrink-0" />
-                <span className="hidden lg:flex w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
-                  <active.Icon className="w-4 h-4" />
-                </span>
-              </>
+              <span className="flex w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)] items-center justify-center text-white shrink-0">
+                <active.Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2} />
+              </span>
             )}
             <h1 className="text-xs lg:text-lg font-semibold lg:font-bold uppercase lg:normal-case tracking-wider lg:tracking-normal text-[var(--body)] lg:text-[var(--foreground)] truncate">
               {active.label}
@@ -276,7 +267,7 @@ export default function Customer() {
           <div className="ml-auto flex items-center gap-3">
             <button type="button" className="btn-teal text-sm whitespace-nowrap" onClick={() => setShowAddPlan(true)}>+ Add plan / number</button>
           </div>
-          <div className="absolute left-0 bottom-0 h-[3px] bg-lime-500 transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
+          <div className="absolute left-0 bottom-0 h-[3px] bg-[var(--primary)] transition-[width] duration-200 ease-linear" style={{ width: `${scrollPct}%` }} />
         </div>
 
         <Suspense fallback={<div className="text-sm text-mute py-10 text-center">Loading…</div>}>
@@ -295,10 +286,10 @@ export default function Customer() {
       {showAddPlan && (
         <Suspense fallback={null}>
           <AddNumberModalLazy
-          currentUser={user}
-          onClose={() => setShowAddPlan(false)}
-          onAdded={() => setShowAddPlan(false)}
-        />
+            currentUser={currentUser}
+            onClose={() => setShowAddPlan(false)}
+            onAdded={() => setShowAddPlan(false)}
+          />
         </Suspense>
       )}
     </div>

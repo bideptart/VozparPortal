@@ -1,136 +1,255 @@
-import { useState, useEffect } from 'react';
-import { User, Lock, Save, Mail, Phone, AtSign } from 'lucide-react';
-import { useApp } from '../../AppContext.jsx';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AtSign, Building2, Lock, Mail, Phone, Save, ShieldCheck, User } from "lucide-react";
+
+import { useApp } from "../../AppContext.jsx";
+import AccountDialog from "@/components/ui/ruixen-dialog";
+
+const BRAND_GRADIENT = "bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]";
+
+const initialsOf = (name) => {
+  if (!name) return "NA";
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() || "")
+    .join("") || "NA";
+};
+
+const titleCase = (value) =>
+  String(value || "user")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const detailRows = (user) => [
+  { icon: Mail, label: "Email", value: user.email || "Not set" },
+  { icon: AtSign, label: "Username", value: user.username || "Not set" },
+  { icon: Phone, label: "Phone", value: user.phone || "Not set" },
+  { icon: Building2, label: "Company", value: user.company || "Not set" },
+];
 
 export default function Account() {
-  const { currentUser, demoMode, updateCurrentUser } = useApp();
-  const DEMO_USER = { name: 'Demo User', company: 'Vozper Demo', email: 'demo@vozper.com', username: 'demo', phone: '+1 (555) 000-0000' };
-  const user = currentUser || (demoMode ? DEMO_USER : {});
-
-  const [profile, setProfile] = useState({ name: '', company: '', email: '', username: '', phone: '' });
-  const [profileBusy, setProfileBusy] = useState(false);
-  const [profileMsg, setProfileMsg] = useState('');
-  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const {
+    currentUser,
+    updateCurrentUser,
+    changePassword,
+    deleteCurrentAccount,
+    authError,
+    setAuthError,
+  } = useApp();
+  const [searchParams] = useSearchParams();
+  const passwordCardRef = useRef(null);
+  const [profileMsg, setProfileMsg] = useState("");
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwBusy, setPwBusy] = useState(false);
-  const [pwMsg, setPwMsg] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pwMsg, setPwMsg] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const user = currentUser || {};
+  const accountType = titleCase(user.userType || user.role || "user");
+  const initials = useMemo(() => initialsOf(user.name || user.company || user.email), [user]);
 
   useEffect(() => {
-    setProfile({
-      name: user.name || '',
-      company: user.company || '',
-      email: user.email || '',
-      username: user.username || '',
-      phone: user.phone || '',
-    });
-  }, [user]);
+    if (searchParams.get("section") === "password" && passwordCardRef.current) {
+      passwordCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [searchParams]);
 
-  const initials = (user.name || 'DU').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  useEffect(() => {
+    setAuthError("");
+  }, [setAuthError]);
 
-  const saveProfile = async (e) => {
-    e.preventDefault();
-    setProfileBusy(true);
-    await new Promise((r) => setTimeout(r, 500));
-    setProfileMsg('Profile updated successfully!');
-    setProfileBusy(false);
-    setTimeout(() => setProfileMsg(''), 3000);
+  const saveProfile = async (patch) => {
+    setAuthError("");
+    const ok = await updateCurrentUser(patch);
+    if (ok) {
+      setProfileMsg("Profile updated successfully.");
+      setTimeout(() => setProfileMsg(""), 3000);
+      return true;
+    }
+    return false;
   };
 
-  const savePw = async (e) => {
-    e.preventDefault();
-    if (pw.next !== pw.confirm) { setPwMsg('Passwords do not match'); return; }
+  const savePw = async (event) => {
+    event.preventDefault();
+    setPwMsg("");
+    setAuthError("");
+
+    if (pw.next !== pw.confirm) {
+      setPwMsg("Passwords do not match.");
+      return;
+    }
+
     setPwBusy(true);
-    await new Promise((r) => setTimeout(r, 500));
-    setPwMsg('Password changed successfully!');
+    const ok = await changePassword({ current: pw.current, next: pw.next });
     setPwBusy(false);
-    setPw({ current: '', next: '', confirm: '' });
-    setTimeout(() => setPwMsg(''), 3000);
+
+    if (ok) {
+      setPwMsg("Password changed successfully.");
+      setPw({ current: "", next: "", confirm: "" });
+      setTimeout(() => setPwMsg(""), 3000);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm("Delete your account and release your number? This cannot be undone.");
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    try {
+      await deleteCurrentAccount();
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   return (
     <div className="space-y-6 animate-fade-up">
-      <p className="text-sm text-[var(--body)]">Manage your profile, login, and contact details.</p>
+      <p className="text-sm text-[var(--body)]">Manage your profile details, contact information, and account security.</p>
 
-      <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-        {/* Summary Card */}
-        <div className="form-card flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white mb-4"
-            style={{ background: 'linear-gradient(135deg, #046BD2, #0086F9)' }}>
-            {initials}
-          </div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)]">{user.name || 'Demo User'}</h3>
-          <p className="text-xs text-[var(--body)] mt-1">{user.role === 'admin' ? 'Administrator' : 'Customer'}</p>
-          <div className="w-full mt-6 space-y-3 text-left">
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-[var(--muted)]">
-              <Mail size={14} className="text-[var(--primary)]" />
-              <span className="text-xs text-[var(--body)]">{user.email || 'demo@vozper.com'}</span>
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.8fr]">
+        <div className="space-y-6">
+          <section className="form-card overflow-hidden p-0">
+            <div className="h-36 bg-[radial-gradient(circle_at_top_left,rgba(37,117,252,0.8),transparent_38%),linear-gradient(135deg,#046BD2_0%,#0B1220_85%)]" />
+            <div className="px-6 pb-6">
+              <div className="-mt-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-end gap-4">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-[var(--surface)] bg-[linear-gradient(135deg,#046BD2,#0086F9)] text-2xl font-bold text-white shadow-lg">
+                    {initials}
+                  </div>
+                  <div className="pb-1">
+                    <h2 className="text-2xl font-semibold text-[var(--foreground)]">{user.name || user.company || "Account"}</h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full border border-[rgba(4,107,210,0.25)] bg-[rgba(4,107,210,0.12)] px-2.5 py-1 font-medium text-[var(--primary)]">
+                        {accountType}
+                      </span>
+                      {user.plan?.label && (
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[var(--body)]">
+                          {user.plan.label} plan
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <AccountDialog user={user} onSave={saveProfile} />
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {detailRows(user).map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="rounded-xl border border-white/10 bg-[var(--muted)]/70 px-4 py-3">
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--body)]/80">
+                      <Icon size={14} className="text-[var(--primary)]" />
+                      {label}
+                    </div>
+                    <div className="mt-2 text-sm text-[var(--foreground)]">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(profileMsg || authError) && (
+                <div className={`mt-4 rounded-lg border px-3 py-2 text-xs ${authError ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-primary/25 bg-primary/10 text-primary"}`}>
+                  {authError || profileMsg}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-[var(--muted)]">
-              <AtSign size={14} className="text-[var(--primary)]" />
-              <span className="text-xs text-[var(--body)]">{user.username || 'demo'}</span>
+          </section>
+
+          <section className="form-card">
+            <div className="rounded-2xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04))] p-5">
+              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-red-400">Danger Zone</div>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteBusy}
+                  className="inline-flex rounded-xl bg-[#ef2f2f] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(239,47,47,0.22)] transition hover:bg-[#ff3c3c] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deleteBusy ? "Deleting..." : "Delete account & release number"}
+                </button>
+              </div>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-[var(--body)]">
+                Cancels your subscription, deletes your agent, and releases your phone number. Cannot be undone.
+              </p>
             </div>
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-[var(--muted)]">
-              <Phone size={14} className="text-[var(--primary)]" />
-              <span className="text-xs text-[var(--body)]">{user.phone || '+1 (555) 000-0000'}</span>
-            </div>
-          </div>
+          </section>
         </div>
 
-        <div className="space-y-6">
-          {/* Profile Form */}
-          <form onSubmit={saveProfile} className="form-card space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-              <User size={16} className="text-[var(--primary)]" /> Profile Information
+        <aside className="space-y-6">
+          <div className="form-card">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+              <ShieldCheck size={16} className="text-[var(--primary)]" /> Account Snapshot
             </h3>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">Full Name</label>
-                <input className="input" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+            <div className="mt-4 space-y-3 text-sm text-[var(--body)]">
+              <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">
+                <span>Account type</span>
+                <span className="font-medium text-[var(--foreground)]">{accountType}</span>
               </div>
-              <div>
-                <label className="field-label">Company</label>
-                <input className="input" value={profile.company} onChange={(e) => setProfile({ ...profile, company: e.target.value })} />
+              <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">
+                <span>Company</span>
+                <span className="font-medium text-[var(--foreground)]">{user.company || "Not set"}</span>
               </div>
-              <div>
-                <label className="field-label">Email</label>
-                <input className="input" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
-              </div>
-              <div>
-                <label className="field-label">Phone</label>
-                <input className="input" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
-              </div>
+              {user.plan?.label && (
+                <div className="flex items-center justify-between rounded-lg bg-[var(--muted)] px-3 py-2">
+                  <span>Current plan</span>
+                  <span className="font-medium text-[var(--foreground)]">{user.plan.label}</span>
+                </div>
+              )}
             </div>
-            {profileMsg && <div className="text-xs text-green-400 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2">{profileMsg}</div>}
-            <button type="submit" className="btn-primary py-2 px-4 text-sm" disabled={profileBusy}>
-              {profileBusy ? 'Saving…' : 'Save Changes'}
-            </button>
-          </form>
+          </div>
 
-          {/* Password Form */}
-          <form onSubmit={savePw} className="form-card space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+          <form ref={passwordCardRef} onSubmit={savePw} className={`form-card space-y-4 ${searchParams.get("section") === "password" ? "ring-2 ring-[var(--primary)]/40" : ""}`}>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <Lock size={16} className="text-[var(--primary)]" /> Change Password
             </h3>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
-                <label className="field-label">Current Password</label>
-                <input className="input" type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
+
+            <div className="space-y-3">
+              <div className="rounded-xl bg-[var(--muted)] px-4 py-3">
+                <label className="mb-2 block text-sm font-medium text-[var(--body)]">Current Password</label>
+                <input
+                  className="input border-white/10 bg-[rgba(255,255,255,0.04)]"
+                  type="password"
+                  value={pw.current}
+                  onChange={(event) => setPw((current) => ({ ...current, current: event.target.value }))}
+                />
               </div>
-              <div>
-                <label className="field-label">New Password</label>
-                <input className="input" type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+              <div className="rounded-xl bg-[var(--muted)] px-4 py-3">
+                <label className="mb-2 block text-sm font-medium text-[var(--body)]">New Password</label>
+                <input
+                  className="input border-white/10 bg-[rgba(255,255,255,0.04)]"
+                  type="password"
+                  value={pw.next}
+                  onChange={(event) => setPw((current) => ({ ...current, next: event.target.value }))}
+                />
               </div>
-              <div>
-                <label className="field-label">Confirm Password</label>
-                <input className="input" type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
+              <div className="rounded-xl bg-[var(--muted)] px-4 py-3">
+                <label className="mb-2 block text-sm font-medium text-[var(--body)]">Confirm Password</label>
+                <input
+                  className="input border-white/10 bg-[rgba(255,255,255,0.04)]"
+                  type="password"
+                  value={pw.confirm}
+                  onChange={(event) => setPw((current) => ({ ...current, confirm: event.target.value }))}
+                />
               </div>
             </div>
-            {pwMsg && <div className={`text-xs rounded-lg px-3 py-2 ${pwMsg.includes('match') ? 'text-red-400 bg-red-500/10 border border-red-500/30' : 'text-green-400 bg-green-500/10 border border-green-500/30'}`}>{pwMsg}</div>}
-            <button type="submit" className="btn-primary py-2 px-4 text-sm" disabled={pwBusy}>
-              {pwBusy ? 'Changing…' : 'Change Password'}
+
+            {(pwMsg || authError) && (
+              <div className={`rounded-lg border px-3 py-2 text-xs ${pwMsg && !pwMsg.includes("not match") ? "border-primary/25 bg-primary/10 text-primary" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
+                {pwMsg || authError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={pwBusy}
+              className="group relative overflow-hidden flex w-full items-center justify-center gap-2 py-2.5 text-sm font-medium text-white rounded-full border border-white/25 transition duration-200 ease-out hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
+              <Save size={14} className="relative" />
+              <span className="relative">{pwBusy ? "Updating..." : "Update Password"}</span>
             </button>
           </form>
-        </div>
+        </aside>
       </div>
     </div>
   );

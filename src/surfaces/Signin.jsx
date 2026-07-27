@@ -26,20 +26,20 @@ export default function Signin() {
   return (
     <div className="auth-shell min-h-screen">
       {/* Left Panel — Brand */}
-      <div className="auth-brand flex-col justify-between hidden lg:flex">
+      <div className="auth-brand flex-col hidden lg:flex">
         <div>
           <Logo size={48} white showWordmark />
         </div>
-        <div className="mt-auto">
+        <div className="flex-1 flex flex-col justify-center text-center">
           <h2 className="text-3xl font-display font-semibold text-[var(--foreground)] mb-3">
             Welcome to Vozper
           </h2>
-          <p className="text-[var(--body)] text-[15px] max-w-md leading-relaxed">
+          <p className="text-[var(--body)] text-[15px] max-w-md mx-auto leading-relaxed">
             AI voice agents that answer every call. Pick a number, drop in your
             knowledge base, choose a voice, and go live in seconds.
           </p>
         </div>
-        <div className="text-xs text-[var(--body)] opacity-60 mt-8">
+        <div className="text-xs text-[var(--body)] opacity-60 text-center">
           © {new Date().getFullYear()} Vozper. Powered by Rozper
         </div>
       </div>
