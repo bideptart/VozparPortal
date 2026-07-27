@@ -1,4 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  CreditCard,
+  Download,
+  ExternalLink,
+  Eye,
+  MoreVertical,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react';
 import { api } from '../../api.js';
 
 const fmtDate = (iso) => {
@@ -7,7 +26,7 @@ const fmtDate = (iso) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const BRAND_GRADIENT = 'bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]';
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString('en-US')}`;
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
@@ -15,8 +34,8 @@ const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
 // same "never overrides real data" rule as the admin surface's demo
 // fallbacks.
 const DEMO_SUB_RESELLERS = [
-  { id: 'demo-1', company: 'Acme Voice Partners', name: 'Jane Acme', email: 'ops@acme.example', username: 'acme', resellerPortal: 'acme-voice.io', phone: '+1 415 555 0100', customerCount: 6, kycLocation: 'Austin, US', createdAt: daysAgo(60) },
-  { id: 'demo-2', company: 'Northstar Comms',     name: 'Devon Lee', email: 'devon@northstar.example', username: 'northstar', resellerPortal: 'northstar.io', phone: '+1 646 555 0121', customerCount: 0, kycLocation: 'Toronto, CA', createdAt: daysAgo(12) },
+  { id: 'demo-1', company: 'Acme Voice Partners', name: 'Jane Acme', email: 'ops@acme.example', username: 'acme', resellerPortal: 'acme-voice.io', phone: '+1 415 555 0100', customerCount: 6, kycLocation: 'Austin, US', createdAt: daysAgo(60), mrr: 93, walletBalance: 1250.75, verified: true },
+  { id: 'demo-2', company: 'Northstar Comms',     name: 'Devon Lee', email: 'devon@northstar.example', username: 'northstar', resellerPortal: 'northstar.io', phone: '+1 646 555 0121', customerCount: 2, kycLocation: 'Toronto, CA', createdAt: daysAgo(12), mrr: 31, walletBalance: 180, verified: true },
 ];
 
 const emptyForm = () => ({
@@ -25,6 +44,290 @@ const emptyForm = () => ({
   resellerPortal: '',
   kycAddress: '', kycLocation: '',
 });
+
+function statusFor(r) {
+  if (r.suspended) return { id: 'suspended', label: 'Suspended', dot: 'bg-red-400', className: 'border-red-500/25 bg-red-500/10 text-red-300' };
+  if (Number(r.customerCount || 0) > 0) return { id: 'active', label: 'Active', dot: 'bg-emerald-400', className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' };
+  return { id: 'pending', label: 'Pending', dot: 'bg-amber-400', className: 'border-amber-500/25 bg-amber-500/10 text-amber-300' };
+}
+
+function initialsFor(name) {
+  return String(name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || '?';
+}
+
+function KpiCard({ icon: Icon, label, value, hint }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 transition-colors duration-200 hover:border-[rgba(4,107,210,0.35)] hover:bg-[var(--muted)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)]">{label}</div>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--glow)] text-[var(--primary)]">
+          <Icon size={14} />
+        </span>
+      </div>
+      <div className="mt-2 text-2xl font-bold leading-none text-[var(--foreground)]">{value}</div>
+      {hint && <div className="mt-2 text-xs text-[var(--body)]">{hint}</div>}
+    </div>
+  );
+}
+
+function CustomSelect({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="input h-10 w-auto min-w-[132px] flex items-center justify-between gap-2 rounded-[var(--radius-sm)] text-sm"
+      >
+        <span className={selected?.value ? 'text-[var(--foreground)]' : 'text-[var(--body)]'}>{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={14} className={`text-[var(--body)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-60 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`flex w-full items-center px-3.5 py-2 text-left text-sm transition-colors duration-150 ${
+                  value === opt.value ? 'bg-[var(--glow)] text-[var(--foreground)]' : 'text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RowMenu({ subReseller, onViewDetails }) {
+  const [open, setOpen] = useState(false);
+  const items = ['View Details', 'Manage Customers', 'Edit', 'Suspend', 'Delete'];
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+        aria-label={`Actions for ${subReseller.company || subReseller.name}`}
+      >
+        <MoreVertical size={15} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+            {items.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => { setOpen(false); if (item === 'View Details') onViewDetails(subReseller); }}
+                className={`block w-full px-3 py-2 text-left text-xs transition-colors duration-150 hover:bg-[var(--muted)] ${
+                  item.includes('Suspend') || item.includes('Delete') ? 'text-red-300' : 'text-[var(--foreground)]'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DetailDrawer({ subReseller, onClose }) {
+  if (typeof document === 'undefined' || !subReseller) return null;
+  const status = statusFor(subReseller);
+  const activity = [
+    { label: 'Account created', at: subReseller.createdAt },
+    ...(subReseller.customerCount > 0 ? [{ label: `Onboarded ${subReseller.customerCount} customer${subReseller.customerCount === 1 ? '' : 's'}`, at: subReseller.createdAt }] : []),
+  ];
+
+  const row = (label, value) => (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <span className="text-xs text-[var(--body)]">{label}</span>
+      <span className="text-sm font-medium text-[var(--foreground)] text-right">{value}</span>
+    </div>
+  );
+
+  const quickAction = 'inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-200 hover:border-[rgba(4,107,210,0.35)] hover:bg-[var(--primary)] hover:text-white';
+
+  const content = (
+    <div className="fixed inset-0 z-[9999]" onClick={onClose}>
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-backdrop-in" />
+      <div
+        className="absolute right-0 top-0 flex h-full w-full max-w-[480px] flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-2xl animate-drawer-in"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sub-reseller-drawer-title"
+      >
+        <div className="shrink-0 border-b border-[var(--border)] p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--glow)] text-sm font-semibold text-[var(--primary)]">
+                {initialsFor(subReseller.company || subReseller.name)}
+              </span>
+              <div className="min-w-0">
+                <h2 id="sub-reseller-drawer-title" className="truncate text-lg font-semibold text-[var(--foreground)]">{subReseller.company || subReseller.name}</h2>
+                <span className={`mt-1 inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium ${status.className}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                  {status.label}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)]">Company Information</div>
+          <div className="mt-1 divide-y divide-[var(--border)]">
+            {row('Portal Slug', subReseller.resellerPortal || '—')}
+            {row('Phone', subReseller.phone || '—')}
+            {row('Email', subReseller.email || '—')}
+            {row('Total Customers', subReseller.customerCount ?? 0)}
+            {row('Monthly Revenue', fmtMoney(subReseller.mrr))}
+            {row('Wallet Balance', fmtMoney(subReseller.walletBalance))}
+            {row('Joined Date', fmtDate(subReseller.createdAt))}
+            {row('KYC Status', subReseller.verified ? 'Verified' : 'Pending review')}
+          </div>
+
+          <div className="mt-6 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)]">Recent Activity</div>
+          <div className="mt-2 space-y-2">
+            {activity.map((a, i) => (
+              <div key={i} className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2.5">
+                <span className="text-xs text-[var(--foreground)]">{a.label}</span>
+                <span className="text-[11px] text-[var(--body)]">{fmtDate(a.at)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-[var(--border)] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)] mb-2">Quick Actions</div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={quickAction}><Users size={13} /> Manage Customers</button>
+            <button type="button" className={quickAction}><CreditCard size={13} /> View Purchases</button>
+            <button type="button" className={quickAction}>Edit</button>
+            <button type="button" className={`${quickAction} !text-red-300 hover:!bg-red-500/15 hover:!text-red-200 hover:!border-red-500/30`}>Suspend</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(content, document.body);
+}
+
+function SubResellerRow({ subReseller, onViewDetails }) {
+  const status = statusFor(subReseller);
+  return (
+    <tr
+      className="border-b border-[var(--border)] transition-colors duration-200 hover:bg-[var(--muted)] cursor-pointer"
+      onClick={() => onViewDetails(subReseller)}
+    >
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--glow)] text-xs font-semibold text-[var(--primary)]">
+            {initialsFor(subReseller.company || subReseller.name)}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-[var(--foreground)]">{subReseller.company || subReseller.name}</div>
+            <div className="truncate text-xs text-[var(--body)]">{subReseller.email}</div>
+            {subReseller.verified && (
+              <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-300">
+                <CheckCircle2 size={11} /> Verified
+              </span>
+            )}
+          </div>
+        </div>
+      </td>
+
+      <td className="px-4 py-4 text-sm">
+        {subReseller.resellerPortal ? (
+          <a
+            href={`https://${subReseller.resellerPortal}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1.5 font-mono text-[var(--primary)] hover:underline"
+          >
+            {subReseller.resellerPortal}
+            <ExternalLink size={12} />
+          </a>
+        ) : (
+          <span className="text-[var(--body)]">—</span>
+        )}
+      </td>
+
+      <td className="px-4 py-4 text-xs text-[var(--body)]">
+        {subReseller.phone ? (
+          <span className="inline-flex items-center gap-1.5 font-mono">
+            <Phone size={11} className="text-[var(--body)]" />
+            {subReseller.phone}
+          </span>
+        ) : '—'}
+      </td>
+
+      <td className="px-4 py-4">
+        <div>
+          <span className={subReseller.customerCount > 0 ? 'pill pill-primary' : 'pill bg-slate-500/15 text-[var(--body)]'}>
+            {subReseller.customerCount ?? 0} {subReseller.customerCount === 1 ? 'Customer' : 'Customers'}
+          </span>
+          {subReseller.customerCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onViewDetails(subReseller); }}
+              className="ml-2 text-xs font-semibold text-[var(--primary)] hover:underline"
+            >
+              View All →
+            </button>
+          )}
+        </div>
+      </td>
+
+      <td className="px-4 py-4 text-xs text-[var(--body)]">{subReseller.kycLocation || '—'}</td>
+
+      <td className="px-4 py-4 whitespace-nowrap text-xs text-[var(--body)]">{fmtDate(subReseller.createdAt)}</td>
+
+      <td className="px-4 py-4 whitespace-nowrap">
+        <span className={`inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-medium ${status.className}`}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${status.dot}`} />
+          {status.label}
+        </span>
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <button type="button" onClick={() => onViewDetails(subReseller)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]" aria-label="View details">
+            <Eye size={15} />
+          </button>
+          <RowMenu subReseller={subReseller} onViewDetails={onViewDetails} />
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 // =============================================================================
 // SubResellers — reseller-only page to on-board sub-resellers. Same shape as
@@ -35,20 +338,30 @@ const emptyForm = () => ({
 export default function SubResellers() {
   const [list, setList]       = useState(null);
   const [err, setErr]         = useState('');
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm]       = useState(emptyForm);
   const [busy, setBusy]       = useState(false);
   const [formErr, setFormErr] = useState('');
   const [createdMsg, setCreatedMsg] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [kycFilter, setKycFilter] = useState('all');
+  const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const load = async () => {
     setErr('');
+    setLoading(true);
     try {
       const r = await api('/api/reseller/sub-resellers');
       setList(r.subResellers || []);
     } catch (e) {
       setErr(e.message);
       setList((prev) => prev ?? []);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,6 +371,33 @@ export default function SubResellers() {
   // genuinely empty — never overrides real data.
   const usingDemo = list !== null && list.length === 0;
   const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_SUB_RESELLERS);
+
+  const kycOptions = useMemo(() => {
+    const locs = new Set();
+    (effectiveList || []).forEach((r) => r.kycLocation && locs.add(r.kycLocation));
+    return [{ value: 'all', label: 'All Locations' }, ...[...locs].map((l) => ({ value: l, label: l }))];
+  }, [effectiveList]);
+
+  const filtered = useMemo(() => {
+    return (effectiveList || []).filter((r) => {
+      if (search) {
+        const haystack = [r.company, r.name, r.email, r.resellerPortal, r.phone].join(' ').toLowerCase();
+        if (!haystack.includes(search.toLowerCase())) return false;
+      }
+      if (statusFilter !== 'all' && statusFor(r).id !== statusFilter) return false;
+      if (kycFilter !== 'all' && r.kycLocation !== kycFilter) return false;
+      return true;
+    });
+  }, [effectiveList, search, statusFilter, kycFilter]);
+
+  const totalCustomers = useMemo(() => (effectiveList || []).reduce((a, r) => a + Number(r.customerCount || 0), 0), [effectiveList]);
+  const totalMrr = useMemo(() => (effectiveList || []).reduce((a, r) => a + Number(r.mrr || 0), 0), [effectiveList]);
+  const activeCount = useMemo(() => (effectiveList || []).filter((r) => statusFor(r).id === 'active').length, [effectiveList]);
+  const activePct = effectiveList?.length ? Math.round((activeCount / effectiveList.length) * 100) : 0;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageSafe = Math.min(page, totalPages);
+  const paginated = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -71,6 +411,7 @@ export default function SubResellers() {
         id: `demo-${Date.now()}`, company: form.company, name: form.name, email: form.email,
         username: form.username, resellerPortal: form.resellerPortal, phone: form.phone,
         customerCount: 0, kycLocation: form.kycLocation, createdAt: new Date().toISOString(),
+        mrr: 0, walletBalance: 0, verified: false,
       };
       setList((cur) => [...(cur && cur.length ? cur : DEMO_SUB_RESELLERS), newRow]);
       setCreatedMsg(`✓ Created ${form.email} (portal: ${form.resellerPortal}) (demo)`);
@@ -92,45 +433,99 @@ export default function SubResellers() {
     }
   };
 
+  const exportCsv = () => {
+    const rows = [
+      ['company', 'email', 'portal_slug', 'phone', 'customers', 'kyc_location', 'status', 'joined'],
+      ...(effectiveList || []).map((r) => [r.company || r.name, r.email, r.resellerPortal || '', r.phone || '', r.customerCount ?? 0, r.kycLocation || '', statusFor(r).label, fmtDate(r.createdAt)]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sub-resellers.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const toolbarButton = 'inline-flex h-10 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card)] px-3.5 text-sm font-medium text-[var(--foreground)] transition-colors duration-200 hover:border-[rgba(4,107,210,0.35)] hover:bg-[var(--primary)] hover:text-white disabled:opacity-50 disabled:pointer-events-none';
+
   return (
-    <div>
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">🤝 Sub-resellers</h1>
-          <p className="text-mute text-sm mt-1">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-xl">
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Sub-resellers</h1>
+          <p className="mt-1 text-sm text-[var(--body)]">
             On-board partners under your brand. Each sub-reseller gets their own
             portal slug and customer list — all rolled up to your downstream.
           </p>
           {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
         </div>
-        <button
-          onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
-          className={`px-4 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT}`}
-        >
-          {showForm ? '× Cancel' : '+ Add sub-reseller'}
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button type="button" onClick={exportCsv} className={toolbarButton}>
+            <Download size={14} /> Export CSV
+          </button>
+          <button type="button" onClick={load} className={toolbarButton} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
+            className="btn-primary text-sm inline-flex items-center gap-1.5"
+          >
+            <Plus size={14} /> {showForm ? 'Cancel' : 'Add Sub-reseller'}
+          </button>
+        </div>
       </div>
 
       {err && (
-        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
-          {err}
+        <div className="rounded-[var(--radius)] border border-red-500/25 bg-[var(--card)] p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-300">
+              <AlertTriangle size={16} />
+            </span>
+            <div className="flex-1 min-w-[200px]">
+              <div className="text-sm font-semibold text-[var(--foreground)]">Session expired</div>
+              <p className="mt-0.5 text-xs text-[var(--body)]">Reconnect your reseller account to continue managing sub-resellers.</p>
+            </div>
+            <button type="button" onClick={load} className="btn-primary text-sm shrink-0">Reconnect</button>
+          </div>
         </div>
       )}
       {createdMsg && (
-        <div className="mt-4 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2">
+        <div className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-[var(--radius)] px-3 py-2">
           {createdMsg}
         </div>
       )}
 
-      {/* === Registration form ============================================== */}
-      {showForm && (
-        <form onSubmit={submit} className="mt-6 form-card space-y-4">
-          <div className="text-sm font-semibold text-[var(--foreground)]">
-            Register a new sub-reseller
-          </div>
-          <div className="text-xs text-mute">
-            All fields are required. The sub-reseller will be created under your
-            account — every customer they on-board rolls up to your downstream.
+      {/* === Registration form (popup) ======================================= */}
+      {showForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-backdrop-in" />
+          <form
+            onSubmit={submit}
+            onClick={(e) => e.stopPropagation()}
+            className="form-card relative w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4 animate-modal-in"
+          >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-[var(--foreground)]">
+                Register a new sub-reseller
+              </div>
+              <div className="mt-1 text-xs text-mute">
+                All fields are required. The sub-reseller will be created under your
+                account — every customer they on-board rolls up to your downstream.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              onClick={() => setShowForm(false)}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -205,54 +600,115 @@ export default function SubResellers() {
             <button type="button" className="btn-ghost text-sm" onClick={() => setShowForm(false)} disabled={busy}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className={`px-5 py-2 rounded-lg text-white text-sm font-semibold ${BRAND_GRADIENT}`}
-            >
+            <button type="submit" disabled={busy} className="btn-primary text-sm">
               {busy ? 'Registering…' : 'Register sub-reseller'}
             </button>
           </div>
-        </form>
+          </form>
+        </div>,
+        document.body
       )}
 
-      {/* === Sub-reseller list ============================================== */}
-      <div className="mt-6 form-card p-0 overflow-x-auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Sub-reseller</th>
-              <th>Portal slug</th>
-              <th>Phone</th>
-              <th>Customers</th>
-              <th>KYC location</th>
-              <th>Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {effectiveList === null && <tr><td colSpan={6} className="text-center text-mute py-6">Loading…</td></tr>}
-            {(effectiveList || []).map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <div className="font-medium">{r.company || r.name}</div>
-                  <div className="text-xs text-mute">{r.email} · @{r.username}</div>
-                </td>
-                <td className="font-mono text-sm text-primary">{r.resellerPortal || '—'}</td>
-                <td className="text-xs text-mute">{r.phone || '—'}</td>
-                <td>
-                  <span className={r.customerCount > 0
-                    ? 'pill pill-primary'
-                    : 'pill bg-slate-500/15 text-[var(--body)]'}>
-                    {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'}
-                  </span>
-                </td>
-                <td className="text-xs text-mute">{r.kycLocation || '—'}</td>
-                <td className="text-xs text-mute">{fmtDate(r.createdAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard icon={Users} label="Total Sub-resellers" value={effectiveList === null ? '—' : effectiveList.length} hint={effectiveList?.length ? `${effectiveList.length} partners on your network` : undefined} />
+        <KpiCard icon={Users} label="Total Customers" value={effectiveList === null ? '—' : totalCustomers} hint="Across all partners" />
+        <KpiCard icon={CreditCard} label="Monthly Revenue" value={effectiveList === null ? '—' : fmtMoney(totalMrr)} hint="Combined MRR from partners" />
+        <KpiCard icon={Clock} label="Active Sub-resellers" value={effectiveList === null ? '—' : activeCount} hint={effectiveList?.length ? `${activePct}% active` : undefined} />
       </div>
+
+      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] flex-1">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--body)]" />
+            <input
+              className="input h-10 rounded-[var(--radius-sm)] pl-10 text-sm"
+              placeholder="Search by reseller name, email, portal slug or phone"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+            {search && (
+              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--body)] hover:text-[var(--foreground)]" onClick={() => setSearch('')} aria-label="Clear search">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <CustomSelect
+            value={statusFilter}
+            onChange={(v) => { setStatusFilter(v); setPage(1); }}
+            options={[{ value: 'all', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'pending', label: 'Pending' }, { value: 'suspended', label: 'Suspended' }]}
+            placeholder="Status"
+          />
+          <CustomSelect value={kycFilter} onChange={(v) => { setKycFilter(v); setPage(1); }} options={kycOptions} placeholder="KYC Location" />
+        </div>
+      </div>
+
+      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="sticky top-0 z-10 bg-[var(--card)]">
+              <tr className="border-b border-[var(--border)]">
+                <th className="text-left px-6 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Sub-reseller</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Portal Slug</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Phone</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Customers</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">KYC Location</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Joined</th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Status</th>
+                <th className="text-right px-4 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--body)] font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {effectiveList === null && (
+                <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-[var(--body)]">Loading…</td></tr>
+              )}
+              {effectiveList !== null && paginated.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-14">
+                    <div className="flex flex-col items-center justify-center gap-2 text-center">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--muted)] text-[var(--body)]">
+                        <Users size={24} />
+                      </div>
+                      <div className="text-sm font-semibold text-[var(--foreground)]">No sub-resellers found</div>
+                      <p className="max-w-sm text-xs text-[var(--body)]">Start growing your reseller network by inviting your first partner.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setShowForm(true); setFormErr(''); }}
+                        className="btn-primary text-sm mt-1 inline-flex items-center gap-1.5"
+                      >
+                        <Plus size={14} /> Add Sub-reseller
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {paginated.map((r) => <SubResellerRow key={r.id} subReseller={r} onViewDetails={setSelected} />)}
+            </tbody>
+          </table>
+        </div>
+
+        {effectiveList !== null && filtered.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-3.5 text-xs text-[var(--body)]">
+            <div className="flex items-center gap-2">
+              <span>Rows per page</span>
+              <CustomSelect
+                value={String(pageSize)}
+                onChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+                options={[10, 25, 50].map((n) => ({ value: String(n), label: String(n) }))}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span>{(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, filtered.length)} of {filtered.length}</span>
+              <div className="flex items-center gap-1">
+                <button type="button" className="btn-ghost text-xs px-2.5 py-1" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pageSafe <= 1}>Prev</button>
+                <button type="button" className="btn-ghost text-xs px-2.5 py-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages}>Next</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <DetailDrawer subReseller={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
