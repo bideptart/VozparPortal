@@ -299,7 +299,7 @@ export default function PricingSection({ onSelectPlan }) {
         </Card>
 
         <Card className="rounded-[24px] border-[rgba(4,107,210,0.28)] bg-[linear-gradient(180deg,rgba(4,107,210,0.12),rgba(255,255,255,0.04))]">
-          <CardHeader className="space-y-4">
+          <CardHeader className="space-y-4 pt-8">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[rgba(4,107,210,0.32)] bg-[rgba(4,107,210,0.12)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
               <ShieldCheck size={14} />
               Enterprise
@@ -309,7 +309,7 @@ export default function PricingSection({ onSelectPlan }) {
               For teams with multiple sites, higher call volumes, or custom compliance needs, we can shape a dedicated commercial package.
             </p>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 pb-8">
             <ul className="space-y-3">
               {ENTERPRISE_POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-3 text-sm leading-6 text-[var(--body)]">
@@ -328,7 +328,7 @@ export default function PricingSection({ onSelectPlan }) {
 
             <a
               href="mailto:sales@vozper.com?subject=Enterprise%20plan%20inquiry"
-              className="btn-primary w-full text-center"
+              className="btn-primary inline-flex w-full items-center justify-center text-center"
             >
               Talk to Sales
             </a>

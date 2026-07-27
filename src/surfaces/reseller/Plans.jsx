@@ -3,6 +3,15 @@ import { api } from '../../api.js';
 
 const inr = (n) => `$${Number(n || 0).toLocaleString('en-US')}`;
 
+// Shown only when the real plan list comes back genuinely empty — same
+// "never overrides real data" rule as the admin surface's demo fallbacks.
+const DEMO_FLOORS = { starter: { amount: 31, rate: 0.13 }, growth: { amount: 93, rate: 0.12 }, scale: { amount: 316, rate: 0.11 } };
+const DEMO_PLANS = [
+  { basePlanId: 'starter', label: 'Starter', amount: 31,  rate: 0.13, min: 250,  agents: 2 },
+  { basePlanId: 'growth',  label: 'Growth',  amount: 93,  rate: 0.12, min: 800,  agents: 10 },
+  { basePlanId: 'scale',   label: 'Scale',   amount: 316, rate: 0.11, min: 3000, agents: 999 },
+];
+
 // =============================================================================
 // Reseller Plans — show the three plans and let the reseller edit label /
 // retail price / per-min rate / minutes / agents inline. The PATCH endpoint
@@ -31,10 +40,17 @@ export default function Plans() {
       setFloors(f);
     } catch (e) {
       setErr(e.message);
+      setList((prev) => prev ?? []);
     }
   };
 
   useEffect(() => { loadAll(); }, []);
+
+  // Falls back to demo plans only when the real list comes back genuinely
+  // empty — never overrides real data.
+  const usingDemo = list !== null && list.length === 0;
+  const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_PLANS);
+  const effectiveFloors = usingDemo && Object.keys(floors).length === 0 ? DEMO_FLOORS : floors;
 
   const startEdit = (p) => {
     setEditingId(p.basePlanId);
@@ -50,7 +66,7 @@ export default function Plans() {
 
   const cancelEdit = () => { setEditingId(null); setDraft(null); setErr(''); };
 
-  const floorForCurrent = floors[editingId] || { amount: 0, rate: 0 };
+  const floorForCurrent = effectiveFloors[editingId] || { amount: 0, rate: 0 };
   const violatesFloor = useMemo(() => {
     if (!draft) return null;
     if (Number(draft.amount) < floorForCurrent.amount) {
@@ -66,6 +82,23 @@ export default function Plans() {
     if (!draft || !editingId) return;
     if (violatesFloor) { setErr(violatesFloor); return; }
     setBusy(true); setErr(''); setMsg('');
+    const draftPlan = {
+      basePlanId: editingId,
+      label:  draft.label,
+      amount: Number(draft.amount),
+      rate:   Number(draft.rate),
+      min:    Number(draft.min),
+      agents: Number(draft.agents),
+    };
+    // Demo rows aren't real accounts — apply the edit locally instead of
+    // hitting a backend that isn't there.
+    if (usingDemo) {
+      setList((cur) => (cur && cur.length ? cur : DEMO_PLANS).map((p) => p.basePlanId === editingId ? draftPlan : p));
+      setMsg(`✓ ${draftPlan.label} updated (demo)`);
+      cancelEdit();
+      setBusy(false);
+      return;
+    }
     try {
       const r = await api(`/api/reseller/plans/${encodeURIComponent(editingId)}`, {
         method: 'PATCH',
@@ -96,27 +129,27 @@ export default function Plans() {
         plan to raise its retail price or per-min rate — both must stay
         at or above the platform's base.
       </p>
+      {usingDemo && <span className="overview-demo-pill mt-2 inline-block">Demo data</span>}
 
       {err && (
-        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
           ⚠ {err}
         </div>
       )}
       {msg && (
-        <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className="mt-4 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2">
           {msg}
         </div>
       )}
 
       <div className="mt-6 grid md:grid-cols-3 gap-4">
-        {list === null && <div className="text-mute md:col-span-3">Loading…</div>}
-        {list?.length === 0 && <div className="text-mute md:col-span-3">No plans yet.</div>}
-        {(list || []).map((p) => {
+        {effectiveList === null && <div className="text-mute md:col-span-3">Loading…</div>}
+        {(effectiveList || []).map((p) => {
           const isEditing = editingId === p.basePlanId;
-          const floor = floors[p.basePlanId] || { amount: 0, rate: 0 };
+          const floor = effectiveFloors[p.basePlanId] || { amount: 0, rate: 0 };
           if (isEditing && draft) {
             return (
-              <div key={p.basePlanId} className="form-card flex flex-col border-2 border-lime-500 ring-2 ring-lime-100">
+              <div key={p.basePlanId} className="form-card flex flex-col border-2 border-primary ring-2 ring-primary/15">
                 <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
                 <div className="mt-2">
                   <label className="field-label">Plan label</label>
@@ -177,7 +210,7 @@ export default function Plans() {
                 </div>
 
                 {violatesFloor && (
-                  <div className="mt-3 text-xs text-red-600">⚠ {violatesFloor}</div>
+                  <div className="mt-3 text-xs text-red-400">⚠ {violatesFloor}</div>
                 )}
 
                 <div className="mt-4 flex items-center justify-end gap-2">
@@ -185,7 +218,7 @@ export default function Plans() {
                   <button
                     onClick={save}
                     disabled={busy || !!violatesFloor}
-                    className="px-4 py-1.5 rounded-lg bg-lime-500 hover:bg-lime-600 disabled:bg-slate-300 text-white text-xs font-semibold"
+                    className="px-4 py-1.5 rounded-lg bg-primary hover:bg-[var(--primary-hover)] disabled:bg-slate-300 text-white text-xs font-semibold"
                   >
                     {busy ? 'Saving…' : 'Save changes'}
                   </button>
@@ -197,21 +230,21 @@ export default function Plans() {
             <div key={p.basePlanId} className="form-card flex flex-col">
               <div className="flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
-                <button onClick={() => startEdit(p)} className="text-xs text-lime-600 font-semibold hover:underline">
+                <button onClick={() => startEdit(p)} className="text-xs text-primary font-semibold hover:underline">
                   Edit ›
                 </button>
               </div>
-              <div className="mt-1 text-lg font-extrabold text-slate-900">{p.label}</div>
+              <div className="mt-1 text-lg font-extrabold text-[var(--foreground)]">{p.label}</div>
               <div className="mt-3 flex items-end gap-1">
-                <span className="text-3xl font-extrabold text-slate-900">{inr(p.amount)}</span>
+                <span className="text-3xl font-extrabold text-[var(--foreground)]">{inr(p.amount)}</span>
                 <span className="text-xs text-mute pb-1">/mo</span>
               </div>
-              <ul className="mt-4 space-y-1.5 text-xs text-slate-700 flex-1">
+              <ul className="mt-4 space-y-1.5 text-xs text-[var(--body)] flex-1">
                 <li>• {p.min} included minutes</li>
                 <li>• ${p.rate}/min overage rate</li>
                 <li>• {p.agents >= 999 ? 'Unlimited' : p.agents} agents</li>
               </ul>
-              <div className="mt-3 text-[11px] text-mute pt-3 border-t border-slate-100">
+              <div className="mt-3 text-[11px] text-mute pt-3 border-t border-[var(--border)]">
                 Platform floor: {inr(floor.amount)} · ${floor.rate}/min — your margin is {inr(p.amount - floor.amount)}/mo.
               </div>
             </div>

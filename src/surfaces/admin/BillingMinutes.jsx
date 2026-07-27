@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, Phone, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, ResponsiveContainer,
-} from 'recharts';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card.jsx';
+  Clock, Phone, AlertTriangle, CheckCircle2, RefreshCw,
+  Download, Tag, ArrowRightLeft, Users, FileBarChart2,
+} from 'lucide-react';
+import { FinancialDashboard } from '../../components/ui/financial-dashboard.jsx';
 import { api } from '../../api.js';
 import { useApp } from '../../AppContext.jsx';
+import { useNavigate } from 'react-router-dom';
 import { readCache, writeCache } from '../../utils/swrCache.js';
 
 const fmtMin = (n) => `${Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 1 })} min`;
@@ -27,14 +27,6 @@ const didsFor = (u) => {
     }];
   }
   return [];
-};
-
-const CHART_COLORS = {
-  grid: '#1A2638',
-  axis: '#CCD6DF',
-  tooltipBg: '#111B2D',
-  tooltipBorder: '#1A2638',
-  tooltipText: '#FFFFFF',
 };
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
@@ -64,41 +56,39 @@ const DEMO_USERS = [
 ];
 
 function statusFor(pct) {
-  if (pct >= 100) return { key: 'over', label: 'Over limit', cls: 'bg-red-500/15 text-red-400' };
-  if (pct >= 80) return { key: 'near', label: 'Near limit', cls: 'bg-amber-500/15 text-amber-400' };
-  return { key: 'ok', label: 'OK', cls: 'bg-lime-500/15 text-lime-400' };
+  if (pct >= 100) return { key: 'over', label: 'Over limit', cls: 'text-red-400' };
+  if (pct >= 80) return { key: 'near', label: 'Near limit', cls: 'text-amber-400' };
+  return { key: 'ok', label: 'OK', cls: 'text-lime-400' };
 }
 
-function MetricCard({ title, value, icon, description, valueClassName }) {
-  return (
-    <Card className="flex-1 min-w-[220px]">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-[var(--body)]">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className={`text-2xl font-bold ${valueClassName || ''}`}>{value}</div>
-        {description && <p className="text-xs text-[var(--body)] mt-1">{description}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
-function UsageBar({ pct }) {
-  const clamped = Math.min(100, Math.max(0, pct));
-  const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-lime-500';
-  return (
-    <div className="w-28 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
-      <div className={`h-full rounded-full ${color}`} style={{ width: `${clamped}%` }} />
-    </div>
-  );
+function downloadRowsCsv(rows) {
+  const header = ['Customer', 'Email', 'Plan(s)', 'Minutes used', 'Minutes included', 'Status', 'Rental / mo'];
+  const lines = rows.map((r) => [
+    r.customer,
+    r.email || '',
+    r.dids.map((d) => d.plan?.label).filter(Boolean).join(' + ') || '—',
+    r.used,
+    r.included,
+    r.status.label,
+    r.rentalCost.toFixed(2),
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','));
+  const csv = [header.join(','), ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `minute-usage-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function BillingMinutes() {
   const { currentUser } = useApp();
+  const navigate = useNavigate();
   const [users, setUsers] = useState(() => readCache('admin.billingMinutes.users', currentUser?.id) ?? null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const load = async () => {
     setErr(''); setLoading(true);
@@ -155,137 +145,98 @@ export default function BillingMinutes() {
     return { included, used, pct: included > 0 ? (used / included) * 100 : 0, overCount, nearCount };
   }, [rows]);
 
-  const chartData = useMemo(
-    () => rows.slice(0, 10).map((r) => ({ label: r.customer.length > 14 ? `${r.customer.slice(0, 13)}…` : r.customer, used: r.used, included: r.included, pct: r.pct })),
-    [rows],
-  );
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.customer.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q));
+  }, [rows, search]);
+
+  const quickActions = [
+    {
+      icon: RefreshCw,
+      title: 'Refresh',
+      description: loading ? 'Updating…' : 'Update usage data',
+      iconClassName: loading ? 'animate-spin' : '',
+      onClick: load,
+    },
+    {
+      icon: Download,
+      title: 'Export',
+      description: 'Download as CSV',
+      onClick: rows.length ? () => downloadRowsCsv(filteredRows) : undefined,
+    },
+    {
+      icon: AlertTriangle,
+      title: 'Near limit',
+      description: `${totals.nearCount} customer${totals.nearCount === 1 ? '' : 's'}`,
+      iconClassName: 'text-amber-400',
+    },
+    {
+      icon: AlertTriangle,
+      title: 'Over limit',
+      description: `${totals.overCount} customer${totals.overCount === 1 ? '' : 's'}`,
+      iconClassName: 'text-red-400',
+    },
+  ];
+
+  const recentActivity = filteredRows.map((r) => ({
+    id: r.id,
+    icon: r.status.key === 'ok' ? CheckCircle2 : AlertTriangle,
+    iconClassName: r.status.cls,
+    title: r.customer,
+    time: `${r.dids.map((d) => d.plan?.label).filter(Boolean).join(' + ') || 'No plan'} · ${fmtMin(r.used)} / ${r.included > 0 ? fmtMin(r.included) : '—'} (${r.status.label})`,
+    amountLabel: `+${fmtUSD(r.rentalCost)}/mo`,
+    tone: 'positive',
+  }));
+
+  const financialServices = [
+    { icon: Tag, title: 'Plans & pricing', description: 'Manage plan tiers and minute allowances', hasAction: true, onClick: () => navigate('/admin/pricing') },
+    { icon: ArrowRightLeft, title: 'Transactions', description: 'Payments, refunds and invoices', hasAction: true, onClick: () => navigate('/admin/transactions') },
+    { icon: Users, title: 'Customers at risk', description: 'Accounts nearing or over their limit', hasAction: true, onClick: () => navigate('/admin/customers-risk') },
+    { icon: FileBarChart2, title: 'Reports', description: 'Call and usage reporting', hasAction: true, onClick: () => navigate('/admin/reports') },
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-base font-semibold tracking-wide" style={{ color: 'var(--ink-2)' }}>
+          <p className="text-base font-semibold tracking-wide text-[var(--foreground)]">
             Minute usage against plan allowance — one row per customer, across every DID they hold.
           </p>
           {usingDemo && <span className="overview-demo-pill">Demo data</span>}
         </div>
-        <button className="btn-refresh" onClick={load} title="Refresh data" disabled={loading}>
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex items-center gap-4 text-sm text-[var(--body)]">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock size={14} /> {fmtMin(totals.used)} / {fmtMin(totals.included)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Phone size={14} /> {totals.pct.toFixed(0)}% utilization
+          </span>
+        </div>
       </div>
 
       {err && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{err}</div>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Minutes used"
-          value={fmtMin(totals.used)}
-          icon={<Clock className="h-4 w-4 text-[var(--body)]" />}
-          description={`of ${fmtMin(totals.included)} included`}
-          valueClassName="text-[var(--primary)]"
-        />
-        <MetricCard
-          title="Platform utilization"
-          value={`${totals.pct.toFixed(0)}%`}
-          icon={<Phone className="h-4 w-4 text-[var(--body)]" />}
-          description="Used ÷ included, across all customers"
-        />
-        <MetricCard
-          title="Near limit"
-          value={totals.nearCount}
-          icon={<AlertTriangle className="h-4 w-4 text-amber-400" />}
-          description="80%+ of included minutes used"
-          valueClassName="text-amber-400"
-        />
-        <MetricCard
-          title="Over limit"
-          value={totals.overCount}
-          icon={<AlertTriangle className="h-4 w-4 text-red-400" />}
-          description="Used more than their plan includes"
-          valueClassName="text-red-400"
-        />
-      </div>
+      <FinancialDashboard
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search customers by name or email…"
+        quickActions={quickActions}
+        activityLabel={`Per-customer minutes${filteredRows.length !== rows.length ? ` (${filteredRows.length} of ${rows.length})` : ''}`}
+        recentActivity={recentActivity}
+        servicesLabel="Related tools"
+        financialServices={financialServices}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Minutes used vs. included — top 10 by usage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div style={{ width: '100%', height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
-                <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke={CHART_COLORS.axis} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}m`} width={40} />
-                <RechartsTooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ backgroundColor: CHART_COLORS.tooltipBg, borderColor: CHART_COLORS.tooltipBorder, borderRadius: '0.5rem' }}
-                  itemStyle={{ color: CHART_COLORS.tooltipText }}
-                  labelStyle={{ color: CHART_COLORS.axis }}
-                  formatter={(value, name) => [fmtMin(value), name === 'used' ? 'Used' : 'Included']}
-                />
-                <Bar dataKey="included" fill="rgba(255,255,255,0.08)" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false} />
-                <Bar dataKey="used" fill="#046BD2" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Per-customer minutes</h2>
-        <div className="form-card p-0 overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Plan(s)</th>
-                <th>Usage</th>
-                <th>Status</th>
-                <th className="text-right">Number rental / mo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && effectiveUsers === null && (
-                <tr><td colSpan={5} className="text-center text-mute py-6">Loading…</td></tr>
-              )}
-              {effectiveUsers !== null && rows.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-mute py-6">No customers yet.</td></tr>
-              )}
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <div className="font-medium">{r.customer}</div>
-                    <div className="text-xs text-mute">{r.email}</div>
-                  </td>
-                  <td className="text-sm">
-                    {r.dids.length > 0
-                      ? r.dids.map((d) => d.plan?.label).filter(Boolean).join(', ') || '—'
-                      : <span className="text-mute italic">none</span>}
-                  </td>
-                  <td>
-                    {r.included > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <UsageBar pct={r.pct} />
-                        <span className="text-xs text-mute whitespace-nowrap">{fmtMin(r.used)} / {fmtMin(r.included)}</span>
-                      </div>
-                    ) : (
-                      <span className="text-mute text-xs italic">no plan minutes</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`pill text-[10px] uppercase tracking-wider font-semibold inline-flex items-center gap-1 ${r.status.cls}`}>
-                      {r.status.key === 'ok' ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                      {r.status.label}
-                    </span>
-                  </td>
-                  <td className="text-right font-semibold text-lime-400">{fmtUSD(r.rentalCost)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {effectiveUsers === null && (
+        <div className="text-center text-mute py-6">Loading…</div>
+      )}
+      {effectiveUsers !== null && rows.length === 0 && (
+        <div className="text-center text-mute py-6">No customers yet.</div>
+      )}
+      {effectiveUsers !== null && rows.length > 0 && filteredRows.length === 0 && (
+        <div className="text-center text-mute py-6">No customers match "{search}".</div>
+      )}
     </div>
   );
 }
