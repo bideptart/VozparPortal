@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 import { readCache, writeCache } from '../../utils/swrCache.js';
+import { DEFAULT_PUBLIC_PLANS } from '@/lib/public-plan-catalog';
 
 // Stripe Checkout loader — duplicated from Billing.jsx so the per-number
 // plan-change dropdown can open the same payment modal without forcing the
@@ -38,68 +39,7 @@ const PLAN_OPTIONS = [
   { id: 'growth',  label: 'Growth',  pill: 'bg-lime-100 text-lime-700 dark:bg-lime-500/30 dark:text-lime-200' },
   { id: 'scale',   label: 'Scale',   pill: 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/30 dark:text-amber-200' },
 ];
-const FALLBACK_ADD_NUMBER_PLANS = [
-  {
-    id: 'starter',
-    label: 'Starter',
-    amount: 29,
-    min: 250,
-    rate: 12,
-    agents: 2,
-    sub: 'For lean teams starting with one live AI line.',
-    perks: [
-      '2 AI voice agents',
-      '250 included minutes',
-      '$12/min effective rate',
-      'Inbound calling',
-      'Per-second billing',
-      'Standard voice stack',
-      'Call recording',
-      'Real-time transcription',
-      'Email support',
-    ],
-  },
-  {
-    id: 'growth',
-    label: 'Growth',
-    amount: 79,
-    min: 800,
-    rate: 11,
-    agents: 10,
-    sub: 'For teams that need more coverage and more automation.',
-    perks: [
-      '10 AI voice agents',
-      '800 included minutes',
-      '$11/min effective rate',
-      'Inbound calling',
-      'Per-second billing',
-      'Standard + premium voices',
-      'Call recording',
-      'Real-time transcription',
-      'Priority support',
-    ],
-  },
-  {
-    id: 'scale',
-    label: 'Scale',
-    amount: 199,
-    min: 3000,
-    rate: 10,
-    agents: 999,
-    sub: 'For high-volume teams that need scale and priority help.',
-    perks: [
-      'Unlimited AI voice agents',
-      '3,000 included minutes',
-      '$10/min effective rate',
-      'Inbound calling',
-      'Per-second billing',
-      'Realtime + premium voices',
-      'Call recording',
-      'Real-time transcription',
-      'Dedicated success manager + SLA',
-    ],
-  },
-];
+const FALLBACK_ADD_NUMBER_PLANS = DEFAULT_PUBLIC_PLANS;
 const planPillClass = (id) => (PLAN_OPTIONS.find((p) => p.id === id) || PLAN_OPTIONS[0]).pill;
 
 // Plan-card header band — green like the "+ Add plan / number" button

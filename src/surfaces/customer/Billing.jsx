@@ -14,6 +14,7 @@ import { api } from '../../api.js';
 import { readCache, writeCache } from '../../utils/swrCache.js';
 import AddCardForm from '../../components/AddCardForm.jsx';
 import BillingUpgradePlans from '@/components/ui/billing-upgrade-plans';
+import { DEFAULT_PUBLIC_PLANS } from '@/lib/public-plan-catalog';
 import { AddNumberModal } from './Numbers.jsx';
 import { Switch } from '@/components/ui/switch';
 
@@ -24,33 +25,7 @@ const TABS = [
   { id: 'auto-recharge', label: 'Auto-recharge' },
 ];
 
-const FALLBACK_PLANS = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    monthly: 19,
-    minutes: 250,
-    agents: 1,
-    description: 'For lean teams that need a clean AI front desk with one live line.',
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    monthly: 49,
-    minutes: 750,
-    agents: 2,
-    description: 'For teams handling more inbound traffic, more reporting, and higher call load.',
-    featured: true,
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    monthly: 129,
-    minutes: 2400,
-    agents: 5,
-    description: 'For larger teams that need multi-line coverage and more automation capacity.',
-  },
-];
+const FALLBACK_PLANS = DEFAULT_PUBLIC_PLANS;
 
 const FALLBACK_WALLET_ACTIVITY = [
   { id: 'w_1', label: 'Wallet top-up', date: 'Jul 18, 2026', amount: '+$50.00' },
@@ -1160,7 +1135,7 @@ export default function Billing() {
                 </div>
               )}
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 space-y-4 xl:max-w-[760px]">
                 {autoRechargePlans.length === 0 ? (
                   <div className="form-card rounded-[20px] text-center">
                     <div className="text-lg font-semibold text-[var(--foreground)]">No plans yet</div>

@@ -4,53 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Phone, X } from "lucide-react";
 
 import { api } from "@/api.js";
+import { DEFAULT_PUBLIC_PLANS } from "@/lib/public-plan-catalog";
 import PricingPicker from "@/components/ui/pricing-picker";
 
-const FALLBACK_PLANS = [
-  {
-    id: "starter",
-    label: "Starter",
-    amount: 29,
-    min: 250,
-    agents: 1,
-    perks: [
-      "250 included minutes",
-      "1 AI voice agent",
-      "Phone number provisioning included",
-      "Shared wallet backup",
-    ],
-    sub: "Best for small teams getting their first AI call workflow live.",
-  },
-  {
-    id: "growth",
-    label: "Growth",
-    amount: 79,
-    min: 750,
-    agents: 3,
-    featured: true,
-    perks: [
-      "750 included minutes",
-      "3 AI voice agents",
-      "Advanced analytics and automations",
-      "Priority support",
-    ],
-    sub: "A strong fit for growing teams that want cleaner AI call operations.",
-  },
-  {
-    id: "scale",
-    label: "Scale",
-    amount: 199,
-    min: 2500,
-    agents: 10,
-    perks: [
-      "2,500 included minutes",
-      "10 AI voice agents",
-      "Multiple numbers and routing",
-      "Priority onboarding support",
-    ],
-    sub: "For larger teams that need more volume, more control, and more support.",
-  },
-];
+const FALLBACK_PLANS = DEFAULT_PUBLIC_PLANS;
 
 function money(amount) {
   return new Intl.NumberFormat("en-US", {
@@ -86,7 +43,7 @@ function normalizePlan(plan) {
     id: plan.id,
     name: plan.label || plan.name || "Plan",
     price: String(amount),
-    yearlyPrice: String(amount),
+    yearlyPrice: String(plan.yearlyAmount ?? amount),
     period: "per month",
     features,
     description: plan.sub || "Voice AI plan with minutes, number provisioning, and billing controls.",

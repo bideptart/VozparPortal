@@ -10,66 +10,21 @@ import { buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { DEFAULT_PUBLIC_PLANS } from "@/lib/public-plan-catalog";
 import { cn } from "@/lib/utils";
 
-const defaultPlans = [
-  {
-    id: "starter",
-    name: "Starter",
-    price: "29",
-    yearlyPrice: "24",
-    period: "per month",
-    features: [
-      "1 production AI voice agent",
-      "250 voice minutes included",
-      "1 phone number included",
-      "Basic analytics and call logs",
-      "Email support",
-    ],
-    description: "Best for small teams getting their first AI call workflow live.",
-    buttonText: "Choose Starter",
-    href: "/dashboard/billing",
-    isPopular: false,
-  },
-  {
-    id: "growth",
-    name: "Professional",
-    price: "79",
-    yearlyPrice: "64",
-    period: "per month",
-    features: [
-      "3 AI voice agents",
-      "750 voice minutes included",
-      "2 live phone numbers",
-      "Advanced analytics and automations",
-      "Priority support",
-      "Shared wallet and plan controls",
-    ],
-    description: "A strong fit for growing teams that want cleaner AI call operations.",
-    buttonText: "Choose Professional",
-    href: "/dashboard/billing",
-    isPopular: true,
-  },
-  {
-    id: "scale",
-    name: "Enterprise",
-    price: "199",
-    yearlyPrice: "169",
-    period: "per month",
-    features: [
-      "10 AI voice agents",
-      "2,500 voice minutes included",
-      "Multiple numbers and routing",
-      "Team-level reporting",
-      "Priority onboarding support",
-      "Custom rollout planning",
-    ],
-    description: "For larger teams that need more volume, more control, and more support.",
-    buttonText: "Talk to Sales",
-    href: "/dashboard/account",
-    isPopular: false,
-  },
-];
+const defaultPlans = DEFAULT_PUBLIC_PLANS.map((plan) => ({
+  id: plan.id,
+  name: plan.label,
+  price: String(plan.amount),
+  yearlyPrice: String(plan.yearlyAmount),
+  period: "per month",
+  features: plan.perks,
+  description: plan.sub,
+  buttonText: plan.featured ? `Choose ${plan.label}` : plan.id === "scale" ? "Talk to Sales" : `Choose ${plan.label}`,
+  href: plan.id === "scale" ? "/dashboard/account" : "/dashboard/billing",
+  isPopular: Boolean(plan.featured),
+}));
 
 export default function PricingPicker({
   plans = defaultPlans,
