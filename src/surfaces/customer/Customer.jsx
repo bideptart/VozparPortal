@@ -130,7 +130,7 @@ export default function Customer() {
   const company = user.company || user.name || 'Your account';
 
   return (
-    <div className={`dashboard-shell ${navCollapsed ? 'nav-collapsed' : ''}`}>
+    <div className={`dashboard-shell dashboard-shell--gradient ${navCollapsed ? 'nav-collapsed' : ''}`}>
       {navOpen && <div className="mobile-nav-backdrop" onClick={() => setNavOpen(false)} />}
 
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>

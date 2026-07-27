@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getToken, setToken } from './api.js';
 
@@ -83,6 +83,7 @@ export function AppProvider({ children }) {
         if (cancelled) return;
         setCurrentUser(user);
         writeBootCache(t, user);
+        sessionExpiredHandledRef.current = false;
       } catch {
         // If API fails and we're in demo mode, use demo user
         if (demoMode) {
@@ -124,6 +125,7 @@ export function AppProvider({ children }) {
     setCurrentUser(user);
     writeBootCache(token, user);
     setAuthError('');
+    sessionExpiredHandledRef.current = false;
   };
 
   const homeFor = (user) => (
@@ -170,7 +172,15 @@ export function AppProvider({ children }) {
     try {
       result = await api('/api/signin', { method: 'POST', body: { identifier, password }, auth: false });
     } catch (err) {
-      // If backend is down or unreachable, auto-enter demo mode
+      // err.status only exists when the server actually responded (wrong
+      // password, empty fields, etc.) — that's a real rejection, not an
+      // outage, and must not silently log the visitor in as a fake admin.
+      // Only a plain network failure (fetch throws before a response
+      // exists, so no .status) means the backend is genuinely unreachable.
+      if (err.status) {
+        setAuthError(err.message || 'Invalid email/username or password');
+        return false;
+      }
       setDemoMode(true);
       sessionStorage.setItem('vozper.demoMode', 'true');
       const demoToken = 'demo-token';
@@ -188,6 +198,7 @@ export function AppProvider({ children }) {
     setCurrentUser(user);
     writeBootCache(token, user);
     setAuthError('');
+    sessionExpiredHandledRef.current = false;
     const params = new URLSearchParams(window.location.search);
     const next = params.get('next');
     navigate(next && next.startsWith('/') ? next : homeFor(user), { replace: true });
@@ -205,6 +216,29 @@ export function AppProvider({ children }) {
     }
     navigate('/', { replace: true });
   };
+
+  // Fired by api.js on any 401 from an authenticated call — happens
+  // whenever the server-side session is gone (expired, revoked by a
+  // password change, etc.) rather than the client-side idle timer. Several
+  // pages fire parallel authenticated requests, so this can fire many times
+  // in one tick; sessionExpiredHandledRef guards it down to a single
+  // sign-out, and gets reset wherever a fresh session/demo-mode is entered.
+  const sessionExpiredHandledRef = useRef(false);
+  const sessionExpiredLogout = async () => {
+    // Demo mode's token is fake — every real API call it makes 401s by
+    // design, and that's already tolerated locally (see updateCurrentUser).
+    // A global sign-out on that would kick the user out of demo mode itself.
+    if (demoMode || sessionExpiredHandledRef.current) return;
+    sessionExpiredHandledRef.current = true;
+    setToken('');
+    clearBootCache();
+    setCurrentUser(null);
+    navigate('/signin?expired=1', { replace: true });
+  };
+  useEffect(() => {
+    window.addEventListener('vozper:session-expired', sessionExpiredLogout);
+    return () => window.removeEventListener('vozper:session-expired', sessionExpiredLogout);
+  }, [demoMode]);
 
   const IDLE_MS = 30 * 60 * 1000;
   const IDLE_KEY = 'vozper.lastActivity';

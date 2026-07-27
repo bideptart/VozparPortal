@@ -56,6 +56,14 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
       const err = new Error((data && data.error) || `Request failed (${res.status})`);
       err.status = res.status;
       err.data = data;
+      // Every admin/customer page fires its own authenticated fetches, and
+      // most only locally catch-and-display — a 401 here means the session
+      // itself is gone, so broadcast it once instead of leaving each call
+      // site to surface (or silently drop) the same "signed out" state.
+      // AppContext owns the actual sign-out/redirect.
+      if (auth && res.status === 401) {
+        window.dispatchEvent(new CustomEvent('vozper:session-expired'));
+      }
       throw err;
     }
     return data;

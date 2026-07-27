@@ -322,6 +322,15 @@ p {
     min-height: 100vh;
     background: var(--background);
   }
+  /* Admin + Customer dashboards only (not Reseller) — soft brand-color glow
+     over the base background, same blue→cyan pair as the page-header icon
+     badge gradient (--grad-start/--grad-end) so it reads as one system. */
+  .dashboard-shell--gradient {
+    background:
+      radial-gradient(1200px 800px at 12% -10%, rgba(4,107,210,0.18), transparent 60%),
+      radial-gradient(1000px 700px at 100% 0%, rgba(34,211,238,0.12), transparent 55%),
+      var(--background);
+  }
   @media (min-width: 1024px) {
     .dashboard-shell { grid-template-columns: 240px 1fr; transition: grid-template-columns .2s ease; }
     .dashboard-shell.nav-collapsed { grid-template-columns: 0px 1fr; }

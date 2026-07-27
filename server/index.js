@@ -654,6 +654,23 @@ const seedAdminUser = async () => {
   console.log('[seed] admin user inserted');
 };
 
+// Hard-coded second superadmin account for Adarsh (MCM BPO). Upserted by
+// email on every boot so the password stays in sync with what's in source
+// even if someone edits it by hand in the DB.
+const seedAdarshAdmin = async () => {
+  const hash = bcrypt.hashSync('92789278', 10);
+  await q(
+    `INSERT INTO users (name, company, username, email, phone, password_hash, role, user_type)
+     VALUES ($1,$2,$3,$4,$5,$6,'admin','superadmin')
+     ON CONFLICT (email) DO UPDATE SET
+       password_hash = EXCLUDED.password_hash,
+       role = 'admin',
+       user_type = 'superadmin'`,
+    ['Adarsh', 'MCM BPO', 'adarsh', 'adarsh@mcmbpo.com', '', hash],
+  );
+  console.log('[seed] adarsh admin user upserted');
+};
+
 // Stripe finalize removed — see finalizeSignupFromRazorpay in the Razorpay block.
 
 // Background: run MCP provisioning (inbound trunk + agent + dispatch rule).
@@ -2055,7 +2072,11 @@ app.post('/api/signin', async (req, res) => {
   }
   if (!r.rowCount) return res.status(401).json({ error: 'Invalid email/username or password' });
   const user = r.rows[0];
-  const ok = await bcrypt.compare(String(password), user.password_hash);
+  // A stray leading/trailing space from autofill or a keystroke is invisible
+  // in the password field but bcrypt.compare is byte-exact — trim it here,
+  // same as identifier already is above, rather than silently rejecting a
+  // password the user can't tell apart from the correct one on screen.
+  const ok = await bcrypt.compare(String(password).trim(), user.password_hash);
   if (!ok) return res.status(401).json({ error: 'Invalid email/username or password' });
 
   const token = newToken();
@@ -5724,6 +5745,7 @@ if (!process.env.VERCEL) {
     }
     try {
       await seedAdminUser();
+      await seedAdarshAdmin();
     } catch (e) {
       console.error('[seed] failed:', e.message);
     }
@@ -5752,7 +5774,9 @@ if (!process.env.VERCEL) {
 } else {
   // Best-effort migrations/seed on cold start; never blocks the handler.
   runMigrations().catch((e) => console.error('[migrations] failed:', e.message));
-  seedAdminUser().catch((e) => console.error('[seed] failed:', e.message));
+  seedAdminUser()
+    .then(() => seedAdarshAdmin())
+    .catch((e) => console.error('[seed] failed:', e.message));
 }
 
 export default app;
