@@ -116,7 +116,7 @@ export default function Plans() {
           const floor = floors[p.basePlanId] || { amount: 0, rate: 0 };
           if (isEditing && draft) {
             return (
-              <div key={p.basePlanId} className="form-card flex flex-col border-2 border-lime-500 ring-2 ring-lime-100">
+              <div key={p.basePlanId} className="form-card flex flex-col border-2 border-primary ring-2 ring-primary/15">
                 <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
                 <div className="mt-2">
                   <label className="field-label">Plan label</label>
@@ -185,7 +185,7 @@ export default function Plans() {
                   <button
                     onClick={save}
                     disabled={busy || !!violatesFloor}
-                    className="px-4 py-1.5 rounded-lg bg-lime-500 hover:bg-lime-600 disabled:bg-slate-300 text-white text-xs font-semibold"
+                    className="px-4 py-1.5 rounded-lg bg-primary hover:bg-[var(--primary-hover)] disabled:bg-slate-300 text-white text-xs font-semibold"
                   >
                     {busy ? 'Saving…' : 'Save changes'}
                   </button>
@@ -197,7 +197,7 @@ export default function Plans() {
             <div key={p.basePlanId} className="form-card flex flex-col">
               <div className="flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
-                <button onClick={() => startEdit(p)} className="text-xs text-lime-600 font-semibold hover:underline">
+                <button onClick={() => startEdit(p)} className="text-xs text-primary font-semibold hover:underline">
                   Edit ›
                 </button>
               </div>

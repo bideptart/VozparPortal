@@ -7,7 +7,7 @@ const fmtDate = (iso) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const BRAND_GRADIENT = 'bg-[linear-gradient(135deg,#0ea5e9_0%,#6366f1_55%,#8b5cf6_110%)]';
+const BRAND_GRADIENT = 'bg-gradient-to-br from-[var(--grad-start)] to-[var(--grad-end)]';
 
 const emptyForm = () => ({
   name: '', company: '', email: '', phone: '',
@@ -127,7 +127,7 @@ export default function SubResellers() {
               <input type="text" className="input text-sm font-mono" required value={form.password} onChange={setField('password')} placeholder="Auto-generate or paste" />
               <button
                 type="button"
-                className="mt-1 text-xs text-lime-600 hover:underline"
+                className="mt-1 text-xs text-primary hover:underline"
                 onClick={() => {
                   const arr = new Uint8Array(12);
                   window.crypto.getRandomValues(arr);
@@ -210,11 +210,11 @@ export default function SubResellers() {
                   <div className="font-medium">{r.company || r.name}</div>
                   <div className="text-xs text-mute">{r.email} · @{r.username}</div>
                 </td>
-                <td className="font-mono text-sm text-lime-600">{r.resellerPortal || '—'}</td>
+                <td className="font-mono text-sm text-primary">{r.resellerPortal || '—'}</td>
                 <td className="text-xs text-mute">{r.phone || '—'}</td>
                 <td>
                   <span className={r.customerCount > 0
-                    ? 'pill bg-lime-500/10 text-lime-700'
+                    ? 'pill pill-primary'
                     : 'pill bg-slate-200 text-slate-600'}>
                     {r.customerCount} {r.customerCount === 1 ? 'customer' : 'customers'}
                   </span>

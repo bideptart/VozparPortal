@@ -101,7 +101,7 @@ export default function Customers() {
         </div>
         <div className="form-card">
           <div className="text-xs text-mute uppercase tracking-wider font-semibold">Plans sold</div>
-          <div className="mt-1 text-2xl font-bold text-lime-600">
+          <div className="mt-1 text-2xl font-bold text-primary">
             {list === null ? '—' : totalDids}
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function Customers() {
                       <div className="font-medium">{c.company || c.name}</div>
                       <div className="text-xs text-mute">{c.email}</div>
                       {dids.length > 1 && (
-                        <div className="mt-1 text-[10px] uppercase tracking-wider text-lime-600 font-semibold">
+                        <div className="mt-1 text-[10px] uppercase tracking-wider text-primary font-semibold">
                           {dids.length} plans
                         </div>
                       )}
@@ -161,7 +161,7 @@ export default function Customers() {
                   <td className="font-mono text-sm">
                     {d.value}
                     {d.isPrimary && dids.length > 1 && (
-                      <span className="ml-2 pill bg-lime-100 text-lime-700 text-[10px] uppercase tracking-wider">primary</span>
+                      <span className="ml-2 pill pill-primary text-[10px] uppercase tracking-wider">primary</span>
                     )}
                   </td>
                   <td>
