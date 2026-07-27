@@ -768,23 +768,23 @@ export default function Billing() {
 
         <Link
           to="/dashboard/transactions"
-          className="btn-ghost text-sm inline-flex items-center justify-center self-start"
+          className="btn-ghost text-sm inline-flex items-center justify-center self-start hover:!border-[rgba(4,107,210,0.28)] hover:!bg-[var(--primary)] hover:!text-white hover:!shadow-[0_12px_28px_-18px_var(--glow-strong)]"
         >
           Transaction history
         </Link>
       </div>
 
       <div className="border-b border-[var(--border)]">
-        <div className="flex flex-wrap gap-6">
+        <div className="flex flex-wrap gap-3">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`pb-3 text-[15px] font-medium border-b-2 transition-colors ${
+              className={`mb-2 inline-flex items-center rounded-full px-4 py-2 text-[15px] font-medium transition-all ${
                 tab === item.id
-                  ? 'border-[var(--primary)] text-[var(--foreground)]'
-                  : 'border-transparent text-[var(--body)] hover:text-[var(--foreground)]'
+                  ? 'bg-[var(--primary)] text-white shadow-[0_12px_28px_-18px_var(--glow-strong)]'
+                  : 'text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               {item.label}
@@ -800,7 +800,9 @@ export default function Billing() {
       )}
 
       {tab === 'my-plans' && (
-        <div className="space-y-6">
+        <div className="space-y-4 !mt-4">
+          <h2 className="text-[18px] font-semibold text-[var(--foreground)]">Active plans</h2>
+
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="space-y-4 lg:w-[260px] lg:flex-none xl:w-[296px]">
               <div className="form-card gradient-border w-full max-w-[260px] rounded-[20px] p-5 lg:max-w-[260px] xl:max-w-[296px]">
@@ -814,17 +816,29 @@ export default function Billing() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-2.5">
-                  <button type="button" className="btn-primary text-sm inline-flex w-full items-center justify-center px-3" onClick={() => setShowAddFunds(true)}>+ Add funds</button>
-                  <button type="button" className="btn-ghost text-xs inline-flex w-full items-center justify-center whitespace-nowrap px-3" onClick={() => setTab('auto-recharge')}>Auto-recharge</button>
+                  <button
+                    type="button"
+                    className="text-sm inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-full px-3 font-semibold transition-all border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[rgba(4,107,210,0.28)] hover:bg-[var(--primary)] hover:text-white hover:shadow-[0_12px_28px_-18px_var(--glow-strong)]"
+                    onClick={() => setShowAddFunds(true)}
+                  >
+                    + Add funds
+                  </button>
+                  <button
+                    type="button"
+                    className={`text-sm inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-full px-3 font-semibold transition-all ${
+                      tab === 'auto-recharge'
+                        ? 'border border-[rgba(4,107,210,0.28)] bg-[var(--primary)] text-white shadow-[0_12px_28px_-18px_var(--glow-strong)]'
+                        : 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[rgba(4,107,210,0.28)] hover:bg-[var(--primary)] hover:text-white hover:shadow-[0_12px_28px_-18px_var(--glow-strong)]'
+                    }`}
+                    onClick={() => setTab('auto-recharge')}
+                  >
+                    Auto-recharge
+                  </button>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4 lg:min-w-0 lg:flex-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[18px] font-semibold text-[var(--foreground)]">Active plans</h2>
-              </div>
-
               {activePlans.length ? (
                 <div className="space-y-4">
                   {activePlans.map((number) => (

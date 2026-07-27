@@ -328,7 +328,7 @@ export default function PricingSection({ onSelectPlan }) {
 
             <a
               href="mailto:sales@vozper.com?subject=Enterprise%20plan%20inquiry"
-              className="btn-primary w-full text-center"
+              className="btn-primary inline-flex w-full items-center justify-center text-center"
             >
               Talk to Sales
             </a>
