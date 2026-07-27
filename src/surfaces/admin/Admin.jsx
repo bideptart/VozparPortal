@@ -50,7 +50,7 @@ const KnowledgeBase = lazy(() => import('../customer/KnowledgeBase.jsx'));
 const NAV_TABS_PRIMARY = [
   { id: 'signups',        label: 'Signups',            Icon: UserPlus },
   { id: 'customers',      label: 'Customers',          Icon: Users },
-  { id: 'customers-risk', label: 'Customers at Risk',  Icon: AlertTriangle },
+  { id: 'customers-risk', label: 'Subscription Alerts', Icon: AlertTriangle },
   { id: 'resellers',      label: 'Reseller',           Icon: Building2 },
   { id: 'payments',       label: 'Price & Revenue',    Icon: DollarSign },
   { id: 'logs',           label: 'Activity Log',       Icon: Activity },

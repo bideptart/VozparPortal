@@ -324,7 +324,7 @@ export default function Billing() {
   const [walletThresholdBusy, setWalletThresholdBusy] = useState(false);
   const [walletThresholdNotice, setWalletThresholdNotice] = useState('');
   const [selectedTopupAmount, setSelectedTopupAmount] = useState(10);
-  const [customTopupAmount, setCustomTopupAmount] = useState('');
+  const [customTopupAmount, setCustomTopupAmount] = useState('10');
   const [topupBusy, setTopupBusy] = useState(false);
   const [topupErr, setTopupErr] = useState('');
   const [autoRechargeSavingIds, setAutoRechargeSavingIds] = useState({});
@@ -994,12 +994,12 @@ export default function Billing() {
 
                 <div className="mt-5 grid grid-cols-4 gap-2.5">
                   {walletPresetAmounts.map((amount) => {
-                    const isSelected = !customTopupAmountInt && selectedTopupAmount === amount;
+                    const isSelected = customTopupAmountInt === amount;
                     return (
                       <button
                         key={amount}
                         type="button"
-                        onClick={() => { setSelectedTopupAmount(amount); setCustomTopupAmount(''); }}
+                        onClick={() => { setSelectedTopupAmount(amount); setCustomTopupAmount(String(amount)); }}
                         disabled={topupBusy}
                         className={`flex h-14 w-full items-center justify-center rounded-2xl border px-2 text-center transition ${
                           isSelected
@@ -1271,12 +1271,12 @@ export default function Billing() {
         >
           <div className="grid grid-cols-4 gap-2.5">
             {walletPresetAmounts.map((amount) => {
-              const isSelected = !customTopupAmountInt && selectedTopupAmount === amount;
+              const isSelected = customTopupAmountInt === amount;
               return (
                 <button
                   key={amount}
                   type="button"
-                  onClick={() => { setSelectedTopupAmount(amount); setCustomTopupAmount(''); }}
+                  onClick={() => { setSelectedTopupAmount(amount); setCustomTopupAmount(String(amount)); }}
                   disabled={topupBusy}
                   className={`flex h-14 w-full items-center justify-center rounded-2xl border px-2 text-center transition ${
                     isSelected

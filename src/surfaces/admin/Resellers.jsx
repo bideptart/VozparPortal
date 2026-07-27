@@ -202,10 +202,9 @@ export default function Resellers() {
         </div>
         <button
           onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
-          className="group relative overflow-hidden px-4 py-2 rounded-lg text-sm font-semibold text-white border border-white/25 transition duration-200 ease-out hover:scale-105 hover:shadow-lg active:scale-95 shrink-0"
+          className="btn-primary text-sm shrink-0"
         >
-          <span className={`absolute inset-0 ${BRAND_GRADIENT} opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300`} aria-hidden="true" />
-          <span className="relative">{showForm ? '× Cancel' : '+ Register new reseller'}</span>
+          {showForm ? '× Cancel' : '+ Register new reseller'}
         </button>
       </div>
 
