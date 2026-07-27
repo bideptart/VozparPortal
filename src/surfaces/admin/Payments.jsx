@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DollarSign, Repeat2, TrendingUp, Clock, RefreshCw, ArrowUpRight } from 'lucide-react';
+import { DollarSign, Repeat2, TrendingUp, Clock, RefreshCw, ArrowUpRight, ChevronDown } from 'lucide-react';
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -75,7 +75,7 @@ const DEMO_USERS = [
 
 function MetricCard({ title, value, icon, description, valueClassName }) {
   return (
-    <Card className="flex-1 min-w-[220px]">
+    <Card className="flex-1 min-w-[220px] border-0">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-[var(--body)]">{title}</CardTitle>
         {icon}
@@ -147,11 +147,17 @@ function NewMrrChart({ data, days, onDaysChange }) {
   // meaningful bars are visible immediately.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollLeft = el.scrollWidth;
+    if (!el) return;
+    // Deferred a frame: right after the duration toggle changes, the wider
+    // inner div hasn't finished layout yet and scrollWidth still reads the
+    // narrower pre-toggle value, so jumping immediately lands back at the
+    // left edge instead of the latest bars.
+    const raf = requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; });
+    return () => cancelAnimationFrame(raf);
   }, [data]);
 
   return (
-    <Card className="flex-1 min-w-[300px]">
+    <Card className="flex-1 min-w-[300px] border-0">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="text-base font-semibold">New MRR — last {days} days</CardTitle>
@@ -197,15 +203,18 @@ function NewMrrChart({ data, days, onDaysChange }) {
 
 // Cumulative growth is genuinely continuous (a running total), so a
 // smoothed area fill is the right chart here — unlike the bar chart above.
-function CumulativeMrrChart({ data }) {
+function CumulativeMrrChart({ data, days }) {
   const first = data[0]?.total ?? 0;
   const last = data[data.length - 1]?.total ?? 0;
   const growthPct = first > 0 ? ((last - first) / first) * 100 : (last > 0 ? 100 : 0);
 
   return (
-    <Card className="flex-1 min-w-[300px]">
+    <Card className="flex-1 min-w-[300px] border-0">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <CardTitle className="text-base font-semibold">Cumulative MRR growth</CardTitle>
+        <div>
+          <CardTitle className="text-base font-semibold">Cumulative MRR growth</CardTitle>
+          <p className="text-xs text-[var(--body)] mt-1">Last {days} days — synced with New MRR</p>
+        </div>
         <ChartStat
           label="Current total"
           value={fmtCurrency(last)}
@@ -262,6 +271,14 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [lastLoaded, setLastLoaded] = useState(null);
   const [newMrrDays, setNewMrrDays] = useState(14);
+  // Per-customer breakdown starts collapsed to just name + total — clicking
+  // a row expands it to show that customer's individual DIDs/plans.
+  const [expandedCustomers, setExpandedCustomers] = useState(() => new Set());
+  const toggleCustomer = (id) => setExpandedCustomers((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   const load = async () => {
     setErr(''); setLoading(true);
@@ -286,12 +303,15 @@ export default function Payments() {
 
   useEffect(() => { load(); }, []);
 
-  // Falls back to demo customers only when the real list comes back
-  // genuinely empty (no backend in this sandbox, or zero customers so far)
-  // — never overrides real data, and every derived number below flows
-  // through this single switch so cards/charts/table/activity all agree.
-  const usingDemo = users !== null && users.length === 0;
-  const effectiveUsers = users === null ? null : (users.length > 0 ? users : DEMO_USERS);
+  // Falls back to demo customers when there's no real revenue to show yet —
+  // either zero customers, or customers who've signed up but haven't
+  // activated a paid DID (a fresh install, same as this sandbox: one test
+  // signup with no plan). Never overrides real data once a customer has an
+  // actual paid plan; every derived number below flows through this single
+  // switch so cards/charts/table/activity all agree.
+  const hasRealRevenue = users !== null && users.some((u) => didsFor(u).some((d) => d.plan));
+  const usingDemo = users !== null && !hasRealRevenue;
+  const effectiveUsers = users === null ? null : (hasRealRevenue ? users : DEMO_USERS);
 
   // Locally re-derive MRR from the per-DID plan tiers so every number on
   // this page (cards, charts, table) agrees with each other — the legacy
@@ -331,9 +351,9 @@ export default function Payments() {
     return rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).slice(0, 10);
   }, [effectiveUsers]);
 
-  // Daily new-MRR added (duration picked via the chart's toggle) and
-  // cumulative MRR growth (always full history), both bucketed from real
-  // signup/activation dates — no simulated data.
+  // Daily new-MRR added and cumulative MRR growth, both bucketed onto the
+  // exact same last-`newMrrDays`-days window so the two charts always plot
+  // the same x-axis and move together when the duration toggle changes.
   const { dailyData, cumulativeData } = useMemo(() => {
     if (!effectiveUsers) return { dailyData: [], cumulativeData: [] };
     const events = [];
@@ -349,7 +369,8 @@ export default function Payments() {
     const ymd = (d) => d.toISOString().slice(0, 10);
     const dayLabel = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    // Last `newMrrDays` calendar days, zero-filled.
+    // Last `newMrrDays` calendar days, zero-filled — the single shared
+    // bucket array both charts render from.
     const days = [];
     const today = new Date(); today.setHours(0, 0, 0, 0);
     for (let i = newMrrDays - 1; i >= 0; i--) {
@@ -363,10 +384,18 @@ export default function Payments() {
       if (bucket) bucket.amount += e.amount;
     }
 
-    let running = 0;
-    const cumulative = events.map((e, i) => {
-      running += e.amount;
-      return { label: e.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), total: running, key: i };
+    // Baseline = revenue added before this window opened, so the cumulative
+    // line's final point always equals the true all-time total no matter
+    // which duration (7d/14d/30d/90d) is selected.
+    const windowStartKey = days[0]?.key;
+    const baseline = events.reduce((sum, e) => (
+      windowStartKey && ymd(e.at) < windowStartKey ? sum + e.amount : sum
+    ), 0);
+
+    let running = baseline;
+    const cumulative = days.map((d) => {
+      running += d.amount;
+      return { label: d.label, total: running };
     });
 
     return { dailyData: days, cumulativeData: cumulative };
@@ -424,11 +453,11 @@ export default function Payments() {
       {/* Charts */}
       <div className="flex flex-wrap gap-4">
         <NewMrrChart data={dailyData} days={newMrrDays} onDaysChange={setNewMrrDays} />
-        <CumulativeMrrChart data={cumulativeData} />
+        <CumulativeMrrChart data={cumulativeData} days={newMrrDays} />
       </div>
 
       {/* Recent activity */}
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-[var(--primary)]" /> Recent plan activity
@@ -460,75 +489,90 @@ export default function Payments() {
         </CardContent>
       </Card>
 
-      {/* Full per-customer breakdown */}
+      {/* Full per-customer breakdown — collapsed to name + total by default;
+          click a customer to expand and see their individual DIDs/plans.
+          Keeps every customer visually bifurcated without a long scroll of
+          open tables. */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Per-customer recurring</h2>
-        <div className="form-card p-0 overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Number</th>
-                <th>Plan</th>
-                <th>Cycle</th>
-                <th className="text-right">/ mo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {effectiveUsers === null && <tr><td colSpan={5} className="text-center text-mute py-6">Loading…</td></tr>}
-              {(effectiveUsers || []).flatMap((u) => {
-                const dids = didsFor(u);
-                if (dids.length === 0) {
-                  return [(
-                    <tr key={u.id}>
-                      <td>
-                        <div className="font-medium">{u.company || u.name}</div>
-                        <div className="text-xs text-mute">{u.email}</div>
-                      </td>
-                      <td className="text-mute text-sm">—</td>
-                      <td className="text-mute text-sm">—</td>
-                      <td className="text-mute text-sm">—</td>
-                      <td className="text-right text-mute">—</td>
-                    </tr>
-                  )];
-                }
-                const total = dids.reduce((a, d) => a + monthlyFor(d), 0);
-                return dids.map((d, i) => (
-                  <tr key={`${u.id}-${d.id}`}>
-                    {i === 0 ? (
-                      <td rowSpan={dids.length + 1} className="align-top">
-                        <div className="font-medium">{u.company || u.name}</div>
-                        <div className="text-xs text-mute">{u.email}</div>
-                        <div className="mt-2 text-[11px] uppercase tracking-wider text-mute">{dids.length} plan{dids.length > 1 ? 's' : ''}</div>
-                      </td>
-                    ) : null}
-                    <td className="font-mono text-sm">
-                      {d.value}
-                      {d.isPrimary && (
-                        <span className="ml-2 pill bg-lime-500/15 text-lime-700 text-[10px] uppercase tracking-wider font-semibold">primary</span>
-                      )}
-                    </td>
-                    <td>{d.plan ? `${fmtCurrency(d.plan.amount)} · ${d.plan.label}` : '—'}</td>
-                    <td className="text-xs">
-                      <span className={`pill text-[10px] uppercase tracking-wider ${
-                        d.planCycle === 'yearly' ? 'bg-emerald-500/15 text-emerald-700 font-semibold' : 'bg-slate-500/15 text-slate-700 font-semibold'
-                      }`}>
-                        {d.planCycle === 'yearly' ? 'Yearly' : 'Monthly'}
-                      </span>
-                    </td>
-                    <td className="text-right text-lime-400">{fmtCurrency(monthlyFor(d))}</td>
-                  </tr>
-                )).concat([(
-                  <tr key={`${u.id}-total`} className="bg-slate-500/5">
-                    <td className="text-xs uppercase tracking-wider text-mute">Total</td>
-                    <td />
-                    <td />
-                    <td className="text-right font-semibold text-lime-400">{fmtCurrency(total)}</td>
-                  </tr>
-                )]);
-              })}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          {effectiveUsers === null && (
+            <Card className="border-0"><CardContent className="text-center text-mute py-6">Loading…</CardContent></Card>
+          )}
+          {(effectiveUsers || []).map((u) => {
+            const dids = didsFor(u);
+            const total = dids.reduce((a, d) => a + monthlyFor(d), 0);
+            const isOpen = expandedCustomers.has(u.id);
+            return (
+              <Card key={u.id} className="overflow-hidden border-0">
+                <button
+                  type="button"
+                  onClick={() => toggleCustomer(u.id)}
+                  className="w-full flex items-center justify-between gap-3 px-6 py-4 text-left appearance-none bg-transparent"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex items-center gap-3">
+                    <ChevronDown
+                      className={`h-4 w-4 text-mute shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                    <div>
+                      <div className="text-base font-semibold">{u.company || u.name}</div>
+                      <p className="text-xs text-mute mt-0.5">{u.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-[11px] uppercase tracking-wider text-mute">
+                      {dids.length} plan{dids.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-base font-semibold text-lime-400">{fmtCurrency(total)}</span>
+                  </div>
+                </button>
+                {isOpen && (
+                  <CardContent className="p-0 border-t border-[var(--border)]">
+                    {dids.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-mute">No active plan</p>
+                    ) : (
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Number</th>
+                            <th>Plan</th>
+                            <th>Cycle</th>
+                            <th className="text-right">/ mo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dids.map((d) => (
+                            <tr key={d.id}>
+                              <td className="font-mono text-sm">
+                                {d.value}
+                                {d.isPrimary && (
+                                  <span className="ml-2 pill bg-lime-500/15 text-lime-400 text-[10px] uppercase tracking-wider font-semibold">primary</span>
+                                )}
+                              </td>
+                              <td>{d.plan ? `${fmtCurrency(d.plan.amount)} · ${d.plan.label}` : '—'}</td>
+                              <td className="text-xs">
+                                <span className={`pill text-[10px] uppercase tracking-wider ${
+                                  d.planCycle === 'yearly' ? 'bg-emerald-500/15 text-emerald-400 font-semibold' : 'bg-slate-500/15 text-[var(--body)] font-semibold'
+                                }`}>
+                                  {d.planCycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                                </span>
+                              </td>
+                              <td className="text-right text-lime-400">{fmtCurrency(monthlyFor(d))}</td>
+                            </tr>
+                          ))}
+                          <tr className="bg-slate-500/5">
+                            <td colSpan={3} className="text-xs uppercase tracking-wider text-mute">Total</td>
+                            <td className="text-right font-semibold text-lime-400">{fmtCurrency(total)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>
