@@ -5,7 +5,7 @@ import {
   List, UserPlus, Users, AlertTriangle, Building2, DollarSign, Activity, HeartPulse, RefreshCw,
   Database, PhoneCall, Zap,
 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
 import { AddNumberModal } from '../customer/Numbers.jsx';
@@ -161,7 +161,7 @@ export default function Admin() {
   const ActiveIcon = activeTab?.Icon;
 
   return (
-    <div className={`dashboard-shell ${isAdminTier && navCollapsed ? 'nav-collapsed' : ''}`}>
+    <div className={`dashboard-shell dashboard-shell--gradient ${isAdminTier && navCollapsed ? 'nav-collapsed' : ''}`}>
       {navOpen && <div className="mobile-nav-backdrop" onClick={() => setNavOpen(false)} />}
 
       <aside className={`sidenav ${navOpen ? 'is-open' : ''}`}>
@@ -379,6 +379,7 @@ function ServiceLatencyChart({ seed, latencyMs, up }) {
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
+          <XAxis dataKey="t" hide />
           <YAxis hide domain={[0, 'dataMax + 20']} />
           <Tooltip
             contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}

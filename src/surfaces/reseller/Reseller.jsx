@@ -52,7 +52,7 @@ export default function Reseller() {
         <Link
           to="/reseller/customers"
           className="h-16 flex items-center gap-2 px-4 bg-[var(--popover)] sticky top-0 z-30 border-b border-[var(--border)]"
-          aria-label="kallus.io home"
+          aria-label="Vozpar home"
         >
           <Logo size={32} />
         </Link>
@@ -66,7 +66,7 @@ export default function Reseller() {
               {currentUser.company || currentUser.name}
             </div>
             {currentUser.resellerPortal && (
-              <div className="mt-0.5 text-[11px] font-mono text-lime-400 truncate">
+              <div className="mt-0.5 text-[11px] font-mono text-link truncate">
                 {currentUser.resellerPortal}
               </div>
             )}
