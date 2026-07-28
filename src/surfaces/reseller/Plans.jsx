@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api.js';
+import PricingSectionPreview from '@/components/ui/pricing-section-2';
 
 const inr = (n) => `$${Number(n || 0).toLocaleString('en-US')}`;
 
@@ -142,115 +143,24 @@ export default function Plans() {
         </div>
       )}
 
-      <div className="mt-6 grid md:grid-cols-3 gap-4">
-        {effectiveList === null && <div className="text-mute md:col-span-3">Loading…</div>}
-        {(effectiveList || []).map((p) => {
-          const isEditing = editingId === p.basePlanId;
-          const floor = effectiveFloors[p.basePlanId] || { amount: 0, rate: 0 };
-          if (isEditing && draft) {
-            return (
-              <div key={p.basePlanId} className="form-card flex flex-col border-2 border-primary ring-2 ring-primary/15">
-                <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
-                <div className="mt-2">
-                  <label className="field-label">Plan label</label>
-                  <input
-                    className="input text-sm"
-                    value={draft.label}
-                    onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                  />
-                </div>
-                <div className="mt-3">
-                  <label className="field-label">Retail price ($/mo)</label>
-                  <input
-                    type="number"
-                    min={floor.amount}
-                    className="input text-sm"
-                    value={draft.amount}
-                    onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
-                  />
-                  <div className="text-[11px] text-mute mt-1">
-                    Floor: <strong>{inr(floor.amount)}</strong> · what you owe us
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="field-label">Per-minute rate ($)</label>
-                  <input
-                    type="number"
-                    min={floor.rate}
-                    step="0.5"
-                    className="input text-sm"
-                    value={draft.rate}
-                    onChange={(e) => setDraft({ ...draft, rate: e.target.value })}
-                  />
-                  <div className="text-[11px] text-mute mt-1">
-                    Floor: <strong>${floor.rate}/min</strong> · what you owe us
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="field-label">Included min</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className="input text-sm"
-                      value={draft.min}
-                      onChange={(e) => setDraft({ ...draft, min: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="field-label">Agents</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className="input text-sm"
-                      value={draft.agents}
-                      onChange={(e) => setDraft({ ...draft, agents: e.target.value })}
-                    />
-                  </div>
-                </div>
+      {effectiveList === null && <div className="text-mute mt-6">Loading…</div>}
 
-                {violatesFloor && (
-                  <div className="mt-3 text-xs text-red-400">⚠ {violatesFloor}</div>
-                )}
-
-                <div className="mt-4 flex items-center justify-end gap-2">
-                  <button className="btn-ghost text-xs" onClick={cancelEdit} disabled={busy}>Cancel</button>
-                  <button
-                    onClick={save}
-                    disabled={busy || !!violatesFloor}
-                    className="px-4 py-1.5 rounded-lg bg-primary hover:bg-[var(--primary-hover)] disabled:bg-slate-300 text-white text-xs font-semibold"
-                  >
-                    {busy ? 'Saving…' : 'Save changes'}
-                  </button>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div key={p.basePlanId} className="form-card flex flex-col">
-              <div className="flex items-center justify-between">
-                <div className="text-xs uppercase tracking-wider font-semibold text-mute">{p.basePlanId}</div>
-                <button onClick={() => startEdit(p)} className="text-xs text-primary font-semibold hover:underline">
-                  Edit ›
-                </button>
-              </div>
-              <div className="mt-1 text-lg font-extrabold text-[var(--foreground)]">{p.label}</div>
-              <div className="mt-3 flex items-end gap-1">
-                <span className="text-3xl font-extrabold text-[var(--foreground)]">{inr(p.amount)}</span>
-                <span className="text-xs text-mute pb-1">/mo</span>
-              </div>
-              <ul className="mt-4 space-y-1.5 text-xs text-[var(--body)] flex-1">
-                <li>• {p.min} included minutes</li>
-                <li>• ${p.rate}/min overage rate</li>
-                <li>• {p.agents >= 999 ? 'Unlimited' : p.agents} agents</li>
-              </ul>
-              <div className="mt-3 text-[11px] text-mute pt-3 border-t border-[var(--border)]">
-                Platform floor: {inr(floor.amount)} · ${floor.rate}/min — your margin is {inr(p.amount - floor.amount)}/mo.
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {effectiveList && effectiveList.length > 0 && (
+        <div className="mt-8 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-6 sm:p-8">
+          <PricingSectionPreview
+            plans={effectiveList}
+            editingId={editingId}
+            draft={draft}
+            setDraft={setDraft}
+            floorFor={(basePlanId) => effectiveFloors[basePlanId] || { amount: 0, rate: 0 }}
+            violatesFloor={violatesFloor}
+            busy={busy}
+            onStartEdit={startEdit}
+            onCancelEdit={cancelEdit}
+            onSave={save}
+          />
+        </div>
+      )}
     </div>
   );
 }
