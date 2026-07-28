@@ -54,29 +54,35 @@ export default function MiniCalendar({ value, min, max, onSelect }) {
   };
 
   return (
-    <div className="rounded-xl border bg-white shadow-xl p-3 w-72" style={{ borderColor: 'var(--line)' }}>
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--popover)] shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)] p-3 w-72">
       <div className="flex items-center justify-between mb-3">
         <button
           type="button"
           onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition"
           aria-label="Previous month"
         >←</button>
-        <div className="text-sm font-semibold text-slate-900">
+        <div className="text-sm font-semibold text-[var(--foreground)]">
           {MONTHS[month.getMonth()]} {month.getFullYear()}
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={goToday} className="btn-teal text-xs px-3 py-1">Today</button>
+          <button
+            type="button"
+            onClick={goToday}
+            className="rounded-full bg-[var(--primary)] px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110"
+          >
+            Today
+          </button>
           <button
             type="button"
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--body)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition"
             aria-label="Next month"
           >→</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wider text-mute font-semibold mb-1">
+      <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wider text-[var(--body)] font-semibold mb-1">
         {WEEKDAYS.map((w) => <div key={w} className="text-center py-1">{w}</div>)}
       </div>
 
@@ -95,8 +101,14 @@ export default function MiniCalendar({ value, min, max, onSelect }) {
               onClick={() => onSelect(key)}
               className={[
                 'aspect-square rounded-lg text-xs font-semibold flex items-center justify-center transition',
-                disabled ? 'text-slate-200 cursor-not-allowed' : muted ? 'text-slate-300 hover:bg-slate-50' : 'text-slate-700 hover:bg-slate-50',
-                isSelected ? 'border-2 border-lime-600 text-lime-700' : (isToday ? 'border border-lime-400' : 'border border-transparent'),
+                disabled
+                  ? 'text-[var(--body)]/30 cursor-not-allowed'
+                  : muted
+                    ? 'text-[var(--body)]/50 hover:bg-[var(--muted)]'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]',
+                isSelected
+                  ? 'bg-[var(--primary)] border border-[var(--primary)] text-white'
+                  : (isToday ? 'border border-[var(--primary)]' : 'border border-transparent'),
               ].join(' ')}
             >
               {d.getDate()}

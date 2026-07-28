@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { Users, CreditCard, Star, Handshake, Menu, LogOut } from 'lucide-react';
+import { Users, CreditCard, Star, Handshake, Menu, DoorOpen } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import Logo from '../../components/Logo.jsx';
 import Footer from '../../components/Footer.jsx';
@@ -84,8 +84,8 @@ export default function Reseller() {
           ))}
 
           <div className="mt-2 pt-2 border-t border-[var(--border)]">
-            <button type="button" onClick={signoutUser} className="nav-group-toggle">
-              Log out <LogOut size={16} strokeWidth={2} />
+            <button type="button" onClick={signoutUser} className="nav-group-toggle nav-logout">
+              Log out <DoorOpen size={16} strokeWidth={2} />
             </button>
           </div>
         </div>

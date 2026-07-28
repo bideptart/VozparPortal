@@ -78,21 +78,56 @@ function KpiCard({ icon: Icon, label, value, hint }) {
 
 function CustomSelect({ value, onChange, options, placeholder }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
   const selected = options.find((o) => o.value === value);
+  const MENU_HEIGHT = Math.min(options.length, 6) * 36 + 12;
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const openUpward = window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT;
+      setPos(
+        openUpward
+          ? { bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width }
+          : { top: rect.bottom + 4, left: rect.left, width: rect.width }
+      );
+    }
+    setOpen((v) => !v);
+  };
+
+  // Portaled + fixed-position so the menu can't be clipped by an ancestor's
+  // overflow-hidden (e.g. the table card wrapping the "Rows per page"
+  // control). Closes on scroll so a stale position never lingers on screen.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
   return (
-    <div className="relative shrink-0">
+    <div className="shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="input h-10 w-auto min-w-[132px] flex items-center justify-between gap-2 rounded-[var(--radius-sm)] text-sm"
       >
         <span className={selected?.value ? 'text-[var(--foreground)]' : 'text-[var(--body)]'}>{selected ? selected.label : placeholder}</span>
         <ChevronDown size={14} className={`text-[var(--body)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-60 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] max-h-64 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]"
+            style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width }}
+          >
             {options.map((opt) => (
               <button
                 key={opt.value}
@@ -106,7 +141,8 @@ function CustomSelect({ value, onChange, options, placeholder }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

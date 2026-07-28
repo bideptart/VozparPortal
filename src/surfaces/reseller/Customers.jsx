@@ -9,6 +9,7 @@ import {
   Eye,
   MoreVertical,
   Phone,
+  Plus,
   RefreshCw,
   Search,
   Users,
@@ -57,6 +58,8 @@ const DEMO_CUSTOMERS = [
   { id: 'demo-6', company: 'Redgate Realty', name: 'Sam Whitfield', email: 'sam@redgate.example', createdAt: daysAgo(48), numberCount: 1,
     numbers: [{ id: 'd6', value: '+1 720 555 0133', isPrimary: true, planCycle: 'yearly', plan: { label: 'Starter', amount: 31, min: 250 } }], minutesUsed: 40 },
 ];
+
+const emptyCustomerForm = () => ({ company: '', name: '', email: '', phone: '' });
 
 // Resolve the symbol + format for the reseller's storefront currency.
 const symbolFor = (cur) => (cur === 'USD' ? '$' : `${cur || '$'} `);
@@ -174,21 +177,56 @@ function KpiCard({ icon: Icon, label, value, hint }) {
 
 function CustomSelect({ value, onChange, options, placeholder }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
   const selected = options.find((o) => o.value === value);
+  const MENU_HEIGHT = Math.min(options.length, 6) * 36 + 12;
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const openUpward = window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT;
+      setPos(
+        openUpward
+          ? { bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width }
+          : { top: rect.bottom + 4, left: rect.left, width: rect.width }
+      );
+    }
+    setOpen((v) => !v);
+  };
+
+  // Portaled + fixed-position so the menu can't be clipped by an ancestor's
+  // overflow-hidden (e.g. the table card wrapping the "Rows per page"
+  // control). Closes on scroll so a stale position never lingers on screen.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
   return (
-    <div className="relative shrink-0">
+    <div className="shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="input h-10 w-auto min-w-[132px] flex items-center justify-between gap-2 rounded-[var(--radius-sm)] text-sm"
       >
         <span className={selected?.value ? 'text-[var(--foreground)]' : 'text-[var(--body)]'}>{selected ? selected.label : placeholder}</span>
         <ChevronDown size={14} className={`text-[var(--body)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] max-h-64 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]"
+            style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width }}
+          >
             {options.map((opt) => (
               <button
                 key={opt.value}
@@ -202,7 +240,8 @@ function CustomSelect({ value, onChange, options, placeholder }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
@@ -343,6 +382,7 @@ function DetailDrawer({ customer, currency, onClose, onSuspend, onDelete }) {
           <div className="mt-1 divide-y divide-[var(--border)]">
             {row('Contact', customer.name || '—')}
             {row('Email', customer.email || '—')}
+            {customer.phone && row('Contact Phone', customer.phone)}
             {row('Numbers Provisioned', dids.length)}
             {row('Minutes Used', `${Number(customer.minutesUsed || 0).toLocaleString('en-US')}${allowance ? ` / ${allowance}` : ''} min`)}
             {row('Joined Date', fmtDate(customer.createdAt))}
@@ -575,6 +615,10 @@ export default function Customers() {
   const [pageSize, setPageSize] = useState(10);
   const [notice, setNotice] = useState(null); // { tone: 'success' | 'info', text }
   const [selected, setSelected] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyCustomerForm);
+  const [formErr, setFormErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const currency = currentUser?.displayCurrency || 'USD';
 
@@ -614,6 +658,48 @@ export default function Customers() {
     setList((cur) => seededList().filter((c) => c.id !== customer.id));
     setNotice({ tone: 'success', text: `✓ ${customer.company || customer.name} deleted` });
     if (selected?.id === customer.id) setSelected(null);
+  };
+
+  const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // No backend endpoint exists yet for a reseller to create a customer
+  // directly — this still tries the real API first (so the moment that
+  // endpoint ships, this form starts persisting for real with no further
+  // changes here) and only falls back to a local-only row when that call
+  // fails, same "(local only)" honesty used elsewhere on this page.
+  const submitCustomer = async (e) => {
+    e.preventDefault();
+    setFormErr('');
+    if (!form.company.trim() || !form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+      setFormErr('All fields are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api('/api/reseller/customers', { method: 'POST', body: form });
+      setNotice({ tone: 'success', text: `✓ ${r.customer?.company || form.company} added` });
+      setForm(emptyCustomerForm());
+      setShowForm(false);
+      await load();
+    } catch (e2) {
+      const newRow = {
+        id: `demo-${Date.now()}`,
+        company: form.company.trim(),
+        name: form.name.trim(),
+        email: form.email.trim(),
+        createdAt: new Date().toISOString(),
+        numberCount: 0,
+        numbers: [],
+        minutesUsed: 0,
+        phone: form.phone.trim(),
+      };
+      setList((cur) => [...seededList(), newRow]);
+      setNotice({ tone: 'success', text: `✓ ${newRow.company} added (local only — not yet saved to the server)` });
+      setForm(emptyCustomerForm());
+      setShowForm(false);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const planOptions = useMemo(() => {
@@ -729,6 +815,13 @@ export default function Customers() {
           </button>
           <button type="button" onClick={load} className={toolbarButton} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowForm(true); setFormErr(''); }}
+            className="btn-primary text-sm inline-flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Add Customer
           </button>
         </div>
       </div>
@@ -944,6 +1037,70 @@ export default function Customers() {
       </div>
 
       <DetailDrawer customer={selected} currency={currency} onClose={() => setSelected(null)} onSuspend={toggleSuspend} onDelete={deleteCustomer} />
+
+      {/* === Add customer (popup) =========================================== */}
+      {showForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-backdrop-in" />
+          <form
+            onSubmit={submitCustomer}
+            onClick={(e) => e.stopPropagation()}
+            className="form-card relative w-full max-w-lg space-y-4 animate-modal-in"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[var(--foreground)]">Add a new customer</div>
+                <div className="mt-1 text-xs text-mute">
+                  All fields are required. This customer is added to your portal's customer list.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                onClick={() => setShowForm(false)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="field-label">Company name *</label>
+                <input className="input text-sm" required value={form.company} onChange={setField('company')} placeholder="Acme Voice Partners" />
+              </div>
+              <div>
+                <label className="field-label">Contact name *</label>
+                <input className="input text-sm" required value={form.name} onChange={setField('name')} placeholder="Jane Acme" />
+              </div>
+              <div>
+                <label className="field-label">Phone *</label>
+                <input className="input text-sm" required value={form.phone} onChange={setField('phone')} placeholder="+1 415 555 0100" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="field-label">Email *</label>
+                <input type="email" className="input text-sm" required value={form.email} onChange={setField('email')} placeholder="ops@acme.com" />
+              </div>
+            </div>
+
+            {formErr && (
+              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
+                ⚠ {formErr}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" className="btn-ghost text-sm" onClick={() => setShowForm(false)} disabled={busy}>
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className="btn-primary text-sm">
+                {busy ? 'Adding…' : 'Add Customer'}
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
