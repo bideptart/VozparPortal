@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -111,43 +112,89 @@ function CustomSelect({ value, onChange, options, placeholder }) {
   );
 }
 
-function RowMenu({ subReseller, onViewDetails }) {
+function RowMenu({ subReseller, onViewDetails, onEdit, onSuspend, onDelete }) {
   const [open, setOpen] = useState(false);
-  const items = ['View Details', 'Manage Customers', 'Edit', 'Suspend', 'Delete'];
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+
+  const MENU_HEIGHT = 5 * 32 + 8; // 5 items + vertical padding
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const openUpward = window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT;
+      setPos(
+        openUpward
+          ? { bottom: window.innerHeight - rect.top + 4, right: window.innerWidth - rect.right }
+          : { top: rect.bottom + 4, right: window.innerWidth - rect.right }
+      );
+    }
+    setOpen((v) => !v);
+  };
+
+  // The trigger sits inside a horizontally-scrolling table wrapper — an
+  // absolutely-positioned menu gets clipped by that overflow, so this is
+  // portaled to <body> with a fixed position instead. Close on scroll so a
+  // stale position (from before the scroll) never lingers on screen.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  const items = [
+    { label: 'View Details', onClick: () => onViewDetails(subReseller) },
+    { label: 'Manage Customers', onClick: () => onViewDetails(subReseller) },
+    { label: 'Edit', onClick: () => onEdit(subReseller) },
+    { label: subReseller.suspended ? 'Reactivate' : 'Suspend', onClick: () => onSuspend(subReseller), danger: !subReseller.suspended },
+    { label: 'Delete', onClick: () => onDelete(subReseller), danger: true },
+  ];
+
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
         aria-label={`Actions for ${subReseller.company || subReseller.name}`}
       >
         <MoreVertical size={15} />
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]"
+            style={pos}
+          >
             {items.map((item) => (
               <button
-                key={item}
+                key={item.label}
                 type="button"
-                onClick={() => { setOpen(false); if (item === 'View Details') onViewDetails(subReseller); }}
+                onClick={() => { setOpen(false); item.onClick(); }}
                 className={`block w-full px-3 py-2 text-left text-xs transition-colors duration-150 hover:bg-[var(--muted)] ${
-                  item.includes('Suspend') || item.includes('Delete') ? 'text-red-300' : 'text-[var(--foreground)]'
+                  item.danger ? 'text-red-300' : 'text-[var(--foreground)]'
                 }`}
               >
-                {item}
+                {item.label}
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
 }
 
-function DetailDrawer({ subReseller, onClose }) {
+function DetailDrawer({ subReseller, onClose, onEdit, onSuspend }) {
+  const navigate = useNavigate();
   if (typeof document === 'undefined' || !subReseller) return null;
   const status = statusFor(subReseller);
   const activity = [
@@ -226,10 +273,20 @@ function DetailDrawer({ subReseller, onClose }) {
         <div className="shrink-0 border-t border-[var(--border)] p-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)] mb-2">Quick Actions</div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={quickAction}><Users size={13} /> Manage Customers</button>
-            <button type="button" className={quickAction}><CreditCard size={13} /> View Purchases</button>
-            <button type="button" className={quickAction}>Edit</button>
-            <button type="button" className={`${quickAction} !text-red-300 hover:!bg-red-500/15 hover:!text-red-200 hover:!border-red-500/30`}>Suspend</button>
+            <button type="button" className={quickAction} onClick={() => navigate('/reseller/customers')}>
+              <Users size={13} /> Manage Customers
+            </button>
+            <button type="button" className={quickAction} onClick={() => navigate('/reseller/purchases')}>
+              <CreditCard size={13} /> View Purchases
+            </button>
+            <button type="button" className={quickAction} onClick={() => { onEdit(subReseller); onClose(); }}>Edit</button>
+            <button
+              type="button"
+              className={`${quickAction} !text-red-300 hover:!bg-red-500/15 hover:!text-red-200 hover:!border-red-500/30`}
+              onClick={() => onSuspend(subReseller)}
+            >
+              {subReseller.suspended ? 'Reactivate' : 'Suspend'}
+            </button>
           </div>
         </div>
       </div>
@@ -239,7 +296,7 @@ function DetailDrawer({ subReseller, onClose }) {
   return createPortal(content, document.body);
 }
 
-function SubResellerRow({ subReseller, onViewDetails }) {
+function SubResellerRow({ subReseller, onViewDetails, onEdit, onSuspend, onDelete }) {
   const status = statusFor(subReseller);
   return (
     <tr
@@ -280,10 +337,10 @@ function SubResellerRow({ subReseller, onViewDetails }) {
         )}
       </td>
 
-      <td className="px-4 py-4 text-xs text-[var(--body)]">
+      <td className="px-4 py-4 whitespace-nowrap text-xs text-[var(--body)]">
         {subReseller.phone ? (
-          <span className="inline-flex items-center gap-1.5 font-mono">
-            <Phone size={11} className="text-[var(--body)]" />
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono">
+            <Phone size={11} className="shrink-0 text-[var(--body)]" />
             {subReseller.phone}
           </span>
         ) : '—'}
@@ -322,7 +379,7 @@ function SubResellerRow({ subReseller, onViewDetails }) {
           <button type="button" onClick={() => onViewDetails(subReseller)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]" aria-label="View details">
             <Eye size={15} />
           </button>
-          <RowMenu subReseller={subReseller} onViewDetails={onViewDetails} />
+          <RowMenu subReseller={subReseller} onViewDetails={onViewDetails} onEdit={onEdit} onSuspend={onSuspend} onDelete={onDelete} />
         </div>
       </td>
     </tr>
@@ -340,6 +397,7 @@ export default function SubResellers() {
   const [err, setErr]         = useState('');
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null); // sub-reseller id being edited, or null when creating
   const [form, setForm]       = useState(emptyForm);
   const [busy, setBusy]       = useState(false);
   const [formErr, setFormErr] = useState('');
@@ -401,9 +459,63 @@ export default function SubResellers() {
 
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  // The current list may still be the raw (possibly empty) API response —
+  // seed it with the demo rows first so edits/suspends/deletes against a
+  // demo row have something in state to actually update.
+  const seededList = () => (list && list.length ? list : DEMO_SUB_RESELLERS);
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormErr('');
+    setShowForm(true);
+  };
+
+  const openEditForm = (subReseller) => {
+    setEditingId(subReseller.id);
+    setForm({
+      name: subReseller.name || '',
+      company: subReseller.company || '',
+      email: subReseller.email || '',
+      phone: subReseller.phone || '',
+      username: subReseller.username || '',
+      password: '',
+      resellerPortal: subReseller.resellerPortal || '',
+      kycAddress: subReseller.kycAddress || '',
+      kycLocation: subReseller.kycLocation || '',
+    });
+    setFormErr('');
+    setShowForm(true);
+  };
+
+  const toggleSuspend = (subReseller) => {
+    setList((cur) => seededList().map((r) => (r.id === subReseller.id ? { ...r, suspended: !r.suspended } : r)));
+    setCreatedMsg(`✓ ${subReseller.company || subReseller.name} ${subReseller.suspended ? 'reactivated' : 'suspended'}`);
+  };
+
+  const deleteSubReseller = (subReseller) => {
+    if (!window.confirm(`Delete ${subReseller.company || subReseller.name}? This cannot be undone.`)) return;
+    setList((cur) => seededList().filter((r) => r.id !== subReseller.id));
+    setCreatedMsg(`✓ ${subReseller.company || subReseller.name} deleted`);
+    if (selected?.id === subReseller.id) setSelected(null);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setFormErr(''); setBusy(true);
+
+    // Editing has no backend PATCH endpoint yet — apply the change locally
+    // so the row updates immediately instead of the button doing nothing.
+    if (editingId) {
+      setList((cur) => seededList().map((r) => (r.id === editingId ? { ...r, ...form } : r)));
+      setCreatedMsg(`✓ ${form.company} updated (local only — not yet saved to the server)`);
+      setForm(emptyForm());
+      setEditingId(null);
+      setShowForm(false);
+      setBusy(false);
+      return;
+    }
+
     // Demo rows aren't a real account tree — add the row locally instead of
     // hitting a backend that isn't there.
     if (usingDemo) {
@@ -471,7 +583,7 @@ export default function SubResellers() {
           </button>
           <button
             type="button"
-            onClick={() => { setShowForm((v) => !v); setFormErr(''); }}
+            onClick={() => (showForm ? setShowForm(false) : openCreateForm())}
             className="btn-primary text-sm inline-flex items-center gap-1.5"
           >
             <Plus size={14} /> {showForm ? 'Cancel' : 'Add Sub-reseller'}
@@ -511,11 +623,12 @@ export default function SubResellers() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-[var(--foreground)]">
-                Register a new sub-reseller
+                {editingId ? 'Edit sub-reseller' : 'Register a new sub-reseller'}
               </div>
               <div className="mt-1 text-xs text-mute">
-                All fields are required. The sub-reseller will be created under your
-                account — every customer they on-board rolls up to your downstream.
+                {editingId
+                  ? 'Update this partner\'s company and contact details.'
+                  : 'All fields are required. The sub-reseller will be created under your account — every customer they on-board rolls up to your downstream.'}
               </div>
             </div>
             <button
@@ -545,26 +658,30 @@ export default function SubResellers() {
               <label className="field-label">Work email (login) *</label>
               <input type="email" className="input text-sm" required value={form.email} onChange={setField('email')} placeholder="ops@acme.com" />
             </div>
-            <div>
-              <label className="field-label">Username *</label>
-              <input className="input text-sm" required value={form.username} onChange={setField('username')} placeholder="acme" />
-            </div>
-            <div>
-              <label className="field-label">Password * (8+ chars)</label>
-              <input type="text" className="input text-sm font-mono" required value={form.password} onChange={setField('password')} placeholder="Auto-generate or paste" />
-              <button
-                type="button"
-                className="mt-1 text-xs text-primary hover:underline"
-                onClick={() => {
-                  const arr = new Uint8Array(12);
-                  window.crypto.getRandomValues(arr);
-                  const pwd = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, '').slice(0, 16);
-                  setForm((f) => ({ ...f, password: pwd }));
-                }}
-              >
-                ⟳ Generate strong password
-              </button>
-            </div>
+            {!editingId && (
+              <>
+                <div>
+                  <label className="field-label">Username *</label>
+                  <input className="input text-sm" required value={form.username} onChange={setField('username')} placeholder="acme" />
+                </div>
+                <div>
+                  <label className="field-label">Password * (8+ chars)</label>
+                  <input type="text" className="input text-sm font-mono" required value={form.password} onChange={setField('password')} placeholder="Auto-generate or paste" />
+                  <button
+                    type="button"
+                    className="mt-1 text-xs text-primary hover:underline"
+                    onClick={() => {
+                      const arr = new Uint8Array(12);
+                      window.crypto.getRandomValues(arr);
+                      const pwd = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, '').slice(0, 16);
+                      setForm((f) => ({ ...f, password: pwd }));
+                    }}
+                  >
+                    ⟳ Generate strong password
+                  </button>
+                </div>
+              </>
+            )}
             <div className="sm:col-span-2">
               <label className="field-label">Portal slug *</label>
               <input
@@ -597,11 +714,11 @@ export default function SubResellers() {
           )}
 
           <div className="flex items-center justify-end gap-2">
-            <button type="button" className="btn-ghost text-sm" onClick={() => setShowForm(false)} disabled={busy}>
+            <button type="button" className="btn-ghost text-sm" onClick={() => { setShowForm(false); setEditingId(null); }} disabled={busy}>
               Cancel
             </button>
             <button type="submit" disabled={busy} className="btn-primary text-sm">
-              {busy ? 'Registering…' : 'Register sub-reseller'}
+              {busy ? (editingId ? 'Saving…' : 'Registering…') : (editingId ? 'Save changes' : 'Register sub-reseller')}
             </button>
           </div>
           </form>
@@ -673,7 +790,7 @@ export default function SubResellers() {
                       <p className="max-w-sm text-xs text-[var(--body)]">Start growing your reseller network by inviting your first partner.</p>
                       <button
                         type="button"
-                        onClick={() => { setShowForm(true); setFormErr(''); }}
+                        onClick={openCreateForm}
                         className="btn-primary text-sm mt-1 inline-flex items-center gap-1.5"
                       >
                         <Plus size={14} /> Add Sub-reseller
@@ -682,7 +799,16 @@ export default function SubResellers() {
                   </td>
                 </tr>
               )}
-              {paginated.map((r) => <SubResellerRow key={r.id} subReseller={r} onViewDetails={setSelected} />)}
+              {paginated.map((r) => (
+                <SubResellerRow
+                  key={r.id}
+                  subReseller={r}
+                  onViewDetails={setSelected}
+                  onEdit={openEditForm}
+                  onSuspend={toggleSuspend}
+                  onDelete={deleteSubReseller}
+                />
+              ))}
             </tbody>
           </table>
         </div>
@@ -708,7 +834,7 @@ export default function SubResellers() {
         )}
       </div>
 
-      <DetailDrawer subReseller={selected} onClose={() => setSelected(null)} />
+      <DetailDrawer subReseller={selected} onClose={() => setSelected(null)} onEdit={openEditForm} onSuspend={toggleSuspend} />
     </div>
   );
 }

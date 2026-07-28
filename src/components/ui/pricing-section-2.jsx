@@ -93,15 +93,7 @@ export default function PricingSectionPreview({
                       <span className="rounded-full border border-[rgba(4,107,210,0.28)] bg-[var(--glow)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
                         Popular
                       </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onStartEdit?.(p)}
-                        className="text-xs font-semibold text-[var(--primary)] hover:underline"
-                      >
-                        Edit ›
-                      </button>
-                    )}
+                    ) : null}
                   </div>
                   {!isEditing && (
                     <div className="mt-3 flex items-end gap-1">

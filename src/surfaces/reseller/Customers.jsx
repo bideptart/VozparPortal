@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ChevronDown,
@@ -8,7 +9,6 @@ import {
   Eye,
   MoreVertical,
   Phone,
-  Plus,
   RefreshCw,
   Search,
   Users,
@@ -98,6 +98,7 @@ function usageRatio(c) {
 }
 
 function statusFor(c) {
+  if (c.suspended) return { id: 'suspended', label: 'Suspended', dot: 'bg-red-400', className: 'border-red-500/25 bg-red-500/10 text-red-300' };
   if (!didsFor(c).length) return { id: 'inactive', label: 'Inactive', dot: 'bg-[var(--body)]', className: 'border-[var(--border)] bg-[var(--muted)] text-[var(--body)]' };
   const ratio = usageRatio(c);
   if (ratio >= 0.85) return { id: 'near-limit', label: 'Near Limit', dot: 'bg-amber-400', className: 'border-amber-500/25 bg-amber-500/10 text-amber-300' };
@@ -207,43 +208,207 @@ function CustomSelect({ value, onChange, options, placeholder }) {
   );
 }
 
-function RowMenu({ customer }) {
+function RowMenu({ customer, onBillingHistory, onSuspend, onDelete }) {
   const [open, setOpen] = useState(false);
-  const items = ['Billing History', 'Upgrade Plan', 'Add Number', 'Suspend Customer', 'Delete Customer'];
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const MENU_HEIGHT = 3 * 32 + 8;
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const openUpward = window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT;
+      setPos(
+        openUpward
+          ? { bottom: window.innerHeight - rect.top + 4, right: window.innerWidth - rect.right }
+          : { top: rect.bottom + 4, right: window.innerWidth - rect.right }
+      );
+    }
+    setOpen((v) => !v);
+  };
+
+  // The trigger sits inside a horizontally-scrolling table wrapper — an
+  // absolutely-positioned menu gets clipped by that overflow, so this is
+  // portaled to <body> with a fixed position instead. Close on scroll so a
+  // stale position (from before the scroll) never lingers on screen.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  const items = [
+    { label: 'Billing History', onClick: () => onBillingHistory(customer) },
+    { label: customer.suspended ? 'Reactivate Customer' : 'Suspend Customer', onClick: () => onSuspend(customer), danger: !customer.suspended },
+    { label: 'Delete Customer', onClick: () => onDelete(customer), danger: true },
+  ];
+
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
         aria-label={`Actions for ${customer.company || customer.name}`}
       >
         <MoreVertical size={15} />
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--popover)] py-1 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.5)]"
+            style={pos}
+          >
             {items.map((item) => (
               <button
-                key={item}
+                key={item.label}
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => { setOpen(false); item.onClick(); }}
                 className={`block w-full px-3 py-2 text-left text-xs transition-colors duration-150 hover:bg-[var(--muted)] ${
-                  item.includes('Suspend') || item.includes('Delete') ? 'text-red-300' : 'text-[var(--foreground)]'
+                  item.danger ? 'text-red-300' : 'text-[var(--foreground)]'
                 }`}
               >
-                {item}
+                {item.label}
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
 }
 
-function CustomerRow({ customer, currency }) {
+function DetailDrawer({ customer, currency, onClose, onSuspend, onDelete }) {
+  if (typeof document === 'undefined' || !customer) return null;
+  const dids = didsFor(customer);
+  const status = statusFor(customer);
+  const ratio = usageRatio(customer);
+  const tone = progressTone(ratio);
+  const allowance = totalAllowance(customer);
+
+  const row = (label, value) => (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <span className="text-xs text-[var(--body)]">{label}</span>
+      <span className="text-sm font-medium text-[var(--foreground)] text-right">{value}</span>
+    </div>
+  );
+
+  const quickAction = 'inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors duration-200 hover:border-[rgba(4,107,210,0.35)] hover:bg-[var(--primary)] hover:text-white';
+
+  const content = (
+    <div className="fixed inset-0 z-[9999]" onClick={onClose}>
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-backdrop-in" />
+      <div
+        className="absolute right-0 top-0 flex h-full w-full max-w-[480px] flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-2xl animate-drawer-in"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="customer-drawer-title"
+      >
+        <div className="shrink-0 border-b border-[var(--border)] p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--glow)] text-sm font-semibold text-[var(--primary)]">
+                {initialsFor(customer.company || customer.name)}
+              </span>
+              <div className="min-w-0">
+                <h2 id="customer-drawer-title" className="truncate text-lg font-semibold text-[var(--foreground)]">{customer.company || customer.name}</h2>
+                <span className={`mt-1 inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium ${status.className}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                  {status.label}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)]">Customer Information</div>
+          <div className="mt-1 divide-y divide-[var(--border)]">
+            {row('Contact', customer.name || '—')}
+            {row('Email', customer.email || '—')}
+            {row('Numbers Provisioned', dids.length)}
+            {row('Minutes Used', `${Number(customer.minutesUsed || 0).toLocaleString('en-US')}${allowance ? ` / ${allowance}` : ''} min`)}
+            {row('Joined Date', fmtDate(customer.createdAt))}
+          </div>
+
+          {allowance > 0 && (
+            <div className="mt-4">
+              <div className={`h-1.5 w-full overflow-hidden rounded-full ${tone.track}`}>
+                <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.round(ratio * 100)}%` }} />
+              </div>
+              <div className="mt-1.5 text-[11px] text-[var(--body)]">{Math.round(ratio * 100)}% of monthly allowance used</div>
+            </div>
+          )}
+
+          <div className="mt-6 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)]">Numbers &amp; Plans</div>
+          <div className="mt-2 space-y-2">
+            {dids.length === 0 && <div className="text-xs text-[var(--body)]">No numbers assigned yet.</div>}
+            {dids.map((d) => (
+              <div key={d.id} className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--muted)] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[var(--foreground)]">
+                    <Phone size={11} className="text-[var(--body)]" />
+                    {d.value}
+                    {d.isPrimary && <span className="pill border border-[rgba(4,107,210,0.28)] bg-[var(--glow)] text-[10px] uppercase tracking-wide text-[var(--primary)]">Primary</span>}
+                  </span>
+                  <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium uppercase tracking-wide ${
+                    d.planCycle === 'yearly' ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' : 'border-[var(--border)] bg-[var(--card)] text-[var(--body)]'
+                  }`}>
+                    {d.planCycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-[var(--body)]">
+                  {d.plan ? `${d.plan.label} Plan · ${fmtMoney(d.plan.amount, currency)}/month · ${d.plan.min} min` : 'No plan assigned'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-[var(--border)] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--body)] mb-2">Quick Actions</div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`${quickAction} ${customer.suspended ? '' : '!text-red-300 hover:!bg-red-500/15 hover:!text-red-200 hover:!border-red-500/30'}`}
+              onClick={() => onSuspend(customer)}
+            >
+              {customer.suspended ? 'Reactivate Customer' : 'Suspend Customer'}
+            </button>
+            <button
+              type="button"
+              className={`${quickAction} !text-red-300 hover:!bg-red-500/15 hover:!text-red-200 hover:!border-red-500/30`}
+              onClick={() => { onDelete(customer); onClose(); }}
+            >
+              Delete Customer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(content, document.body);
+}
+
+function CustomerRow({ customer, currency, onViewDetails, onSuspend, onDelete }) {
   const dids = didsFor(customer);
   const [expanded, setExpanded] = useState(false);
   const status = statusFor(customer);
@@ -335,17 +500,30 @@ function CustomerRow({ customer, currency }) {
 
         <td className="px-4 py-4">
           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]" aria-label="View customer">
+            <button
+              type="button"
+              onClick={() => onViewDetails(customer)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--body)] transition-colors duration-200 hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              aria-label="View customer"
+            >
               <Eye size={15} />
             </button>
-            <RowMenu customer={customer} />
+            <RowMenu
+              customer={customer}
+              onBillingHistory={() => setExpanded(true)}
+              onSuspend={onSuspend}
+              onDelete={onDelete}
+            />
           </div>
         </td>
       </tr>
 
-      {expanded && dids.length > 1 && (
+      {expanded && (
         <tr className="border-b border-[var(--border)] bg-[var(--muted)]/40">
           <td colSpan={7} className="px-6 py-4">
+            {dids.length === 0 && (
+              <div className="text-xs text-[var(--body)]">No numbers or billing lines yet for this customer.</div>
+            )}
             <div className="space-y-2.5">
               {dids.map((d) => {
                 const dRatio = d.plan?.min ? Math.min(1, Number(customer.minutesUsed || 0) / didsFor(customer).length / d.plan.min) : 0;
@@ -395,6 +573,8 @@ export default function Customers() {
   const [growthRange, setGrowthRange] = useState('30d');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [notice, setNotice] = useState(null); // { tone: 'success' | 'info', text }
+  const [selected, setSelected] = useState(null);
 
   const currency = currentUser?.displayCurrency || 'USD';
 
@@ -418,6 +598,23 @@ export default function Customers() {
   // genuinely empty — never overrides real data.
   const usingDemo = list !== null && list.length === 0;
   const effectiveList = list === null ? null : (list.length > 0 ? list : DEMO_CUSTOMERS);
+
+  // The current list may still be the raw (possibly empty) API response —
+  // seed it with the demo rows first so a row action against a demo row has
+  // something in state to actually update.
+  const seededList = () => (list && list.length ? list : DEMO_CUSTOMERS);
+
+  const toggleSuspend = (customer) => {
+    setList((cur) => seededList().map((c) => (c.id === customer.id ? { ...c, suspended: !c.suspended } : c)));
+    setNotice({ tone: 'success', text: `✓ ${customer.company || customer.name} ${customer.suspended ? 'reactivated' : 'suspended'}` });
+  };
+
+  const deleteCustomer = (customer) => {
+    if (!window.confirm(`Delete ${customer.company || customer.name}? This cannot be undone.`)) return;
+    setList((cur) => seededList().filter((c) => c.id !== customer.id));
+    setNotice({ tone: 'success', text: `✓ ${customer.company || customer.name} deleted` });
+    if (selected?.id === customer.id) setSelected(null);
+  };
 
   const planOptions = useMemo(() => {
     const labels = new Set();
@@ -533,9 +730,6 @@ export default function Customers() {
           <button type="button" onClick={load} className={toolbarButton} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> {loading ? 'Refreshing…' : 'Refresh'}
           </button>
-          <button type="button" className="btn-primary text-sm inline-flex items-center gap-1.5">
-            <Plus size={14} /> Add Customer
-          </button>
         </div>
       </div>
 
@@ -551,6 +745,16 @@ export default function Customers() {
             </div>
             <button type="button" onClick={load} className="btn-primary text-sm shrink-0">Reconnect</button>
           </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className={`text-sm rounded-[var(--radius)] px-3 py-2 border ${
+          notice.tone === 'success'
+            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+            : 'text-amber-300 bg-amber-500/10 border-amber-500/30'
+        }`}>
+          {notice.text}
         </div>
       )}
 
@@ -704,7 +908,16 @@ export default function Customers() {
                   </td>
                 </tr>
               )}
-              {paginated.map((c) => <CustomerRow key={c.id} customer={c} currency={currency} />)}
+              {paginated.map((c) => (
+                <CustomerRow
+                  key={c.id}
+                  customer={c}
+                  currency={currency}
+                  onViewDetails={setSelected}
+                  onSuspend={toggleSuspend}
+                  onDelete={deleteCustomer}
+                />
+              ))}
             </tbody>
           </table>
         </div>
@@ -729,6 +942,8 @@ export default function Customers() {
           </div>
         )}
       </div>
+
+      <DetailDrawer customer={selected} currency={currency} onClose={() => setSelected(null)} onSuspend={toggleSuspend} onDelete={deleteCustomer} />
     </div>
   );
 }
