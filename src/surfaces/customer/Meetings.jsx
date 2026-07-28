@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
 import { api } from '../../api.js';
+import InteractiveCalendar from '@/components/ui/visualize-booking';
 
 // =============================================================================
 // Meetings — surfaces every booking the AI agent scheduled via the n8n
@@ -12,9 +13,6 @@ import { api } from '../../api.js';
 // =============================================================================
 
 // ---- formatting helpers ----------------------------------------------------
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
 const ymd = (d) => {
   if (!d) return '';
   const z = new Date(d);
@@ -77,6 +75,29 @@ const writeMeetingsCache = (userId, upcomingOnly, meetings) => {
   } catch { /* storage full / private-mode — just skip caching */ }
 };
 
+// Shown only when the real meetings list comes back genuinely empty — same
+// "never overrides real data" rule as the other demo fallbacks in this app.
+// Spread across this month and next so the calendar shows badges on more
+// than one page, and across every status/sync state.
+const daysFromNow = (n, hour = 10, minute = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+};
+const DEMO_MEETINGS = [
+  { id: 'demo-m1', name: 'Design Review', start: daysFromNow(2, 10), end: daysFromNow(2, 11),
+    email: 'alice@northwind.example', status: 'confirmed', calendar_link: 'https://calendar.google.com/demo' },
+  { id: 'demo-m2', name: 'Sprint Planning', start: daysFromNow(2, 14), end: daysFromNow(2, 15),
+    phone: '+14155550142', status: 'scheduled' },
+  { id: 'demo-m3', name: 'Client Onboarding Call', start: daysFromNow(5, 9, 0), end: daysFromNow(5, 9, 30),
+    email: 'owen@bluepeak.example', status: 'scheduled', notes: 'First call — walk through setup.' },
+  { id: 'demo-m4', name: 'Renewal Discussion', start: daysFromNow(9, 15, 0), end: daysFromNow(9, 15, 30),
+    phone: '+12125550198', status: 'pending', notes: 'Confirm contract terms before renewal.' },
+  { id: 'demo-m5', name: 'Support Follow-up', start: daysFromNow(-3, 11, 0), end: daysFromNow(-3, 11, 30),
+    email: 'maria@larkspur.example', status: 'completed', calendar_link: 'https://calendar.google.com/demo' },
+];
+
 const STATUS_PILL = {
   scheduled: 'bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-300',
   confirmed: 'bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-300',
@@ -86,102 +107,6 @@ const STATUS_PILL = {
   completed: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
   done:      'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
 };
-
-// =============================================================================
-// Calendar grid — pure flex/grid month view, no external lib.
-// =============================================================================
-function MonthCalendar({ month, onPrev, onNext, onToday, meetingsByDay, selectedDay, onSelectDay }) {
-  // Build a 6-row × 7-col grid. Pad with previous-month and next-month days
-  // so weekday columns line up.
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const firstWeekday = first.getDay();        // 0 = Sun
-  const startDate = new Date(first);
-  startDate.setDate(startDate.getDate() - firstWeekday);
-
-  const cells = [];
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(startDate);
-    d.setDate(startDate.getDate() + i);
-    cells.push(d);
-  }
-
-  const todayKey = ymd(new Date());
-  const inMonth = (d) => d.getMonth() === month.getMonth();
-
-  return (
-    <div className="form-card border-lime-200 dark:border-lime-500/30 animate-fade-up">
-      <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={onPrev}
-          className="btn-ghost text-sm w-8 h-8 flex items-center justify-center rounded-full transition duration-200 ease-out hover:scale-110 active:scale-95"
-          aria-label="Previous month"
-        >←</button>
-        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          {MONTHS[month.getMonth()]} {month.getFullYear()}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onToday}
-            className="btn-teal text-xs px-3 py-1 transition duration-200 ease-out hover:scale-105 active:scale-95"
-          >Today</button>
-          <button
-            onClick={onNext}
-            className="btn-ghost text-sm w-8 h-8 flex items-center justify-center rounded-full transition duration-200 ease-out hover:scale-110 active:scale-95"
-            aria-label="Next month"
-          >→</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wider text-mute font-semibold mb-1">
-        {WEEKDAYS.map((w) => <div key={w} className="text-center py-1">{w}</div>)}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((d) => {
-          const key = ymd(d);
-          const events = meetingsByDay.get(key) || [];
-          const isToday = key === todayKey;
-          const isSelected = selectedDay === key;
-          const muted = !inMonth(d);
-          return (
-            <button
-              key={key}
-              onClick={() => onSelectDay(isSelected ? null : key)}
-              className={[
-                'aspect-square rounded-lg text-left p-1.5 flex flex-col transition duration-200 ease-out hover:scale-105 active:scale-95',
-                muted ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300',
-                muted
-                  ? 'border border-transparent'
-                  : isToday && !isSelected
-                  ? 'border-2 border-lime-600 dark:border-lime-500 animate-today-ring'
-                  : 'border border-slate-100 dark:border-slate-800',
-                isSelected ? 'bg-lime-500 text-white border-lime-500 dark:bg-lime-600 dark:border-lime-600 animate-pop-in' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50',
-              ].join(' ')}
-            >
-              <span className={`text-xs font-semibold ${isSelected ? 'text-white' : ''}`}>{d.getDate()}</span>
-              {events.length > 0 && (
-                <span className={`mt-auto flex items-center gap-0.5 ${isSelected ? '' : ''}`}>
-                  {events.slice(0, 3).map((_, i) => (
-                    <span
-                      key={i}
-                      style={{ animationDelay: `${i * 60}ms` }}
-                      className={`w-1.5 h-1.5 rounded-full animate-dot-pop ${isSelected ? 'bg-white' : 'bg-lime-500'}`}
-                    />
-                  ))}
-                  {events.length > 3 && (
-                    <span className={`text-[9px] font-semibold ml-0.5 ${isSelected ? 'text-white' : 'text-lime-600 dark:text-lime-400'}`}>
-                      +{events.length - 3}
-                    </span>
-                  )}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // =============================================================================
 // Meeting row card.
@@ -309,26 +234,36 @@ export default function Meetings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingOnly]);
 
+  // Falls back to demo meetings only when the real list comes back
+  // genuinely empty — never overrides real data. Respects the same
+  // upcoming-only filter the real fetch would have applied.
+  const usingDemo = meetings !== null && meetings.length === 0;
+  const effectiveMeetings = meetings === null
+    ? null
+    : (meetings.length > 0
+        ? meetings
+        : DEMO_MEETINGS.filter((m) => !upcomingOnly || new Date(m.start).getTime() > Date.now()));
+
   // Index meetings by local day for the calendar dot rendering.
   const meetingsByDay = useMemo(() => {
     const m = new Map();
-    (meetings || []).forEach((mt) => {
+    (effectiveMeetings || []).forEach((mt) => {
       const k = ymd(mt.start);
       if (!k) return;
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(mt);
     });
     return m;
-  }, [meetings]);
+  }, [effectiveMeetings]);
 
   const filteredMeetings = useMemo(() => {
-    if (!meetings) return [];
-    if (!selectedDay) return meetings;
-    return meetings.filter((m) => ymd(m.start) === selectedDay);
-  }, [meetings, selectedDay]);
+    if (!effectiveMeetings) return [];
+    if (!selectedDay) return effectiveMeetings;
+    return effectiveMeetings.filter((m) => ymd(m.start) === selectedDay);
+  }, [effectiveMeetings, selectedDay]);
 
-  const total = (meetings || []).length;
-  const upcomingCount = (meetings || []).filter((m) => new Date(m.start).getTime() > Date.now()).length;
+  const total = (effectiveMeetings || []).length;
+  const upcomingCount = (effectiveMeetings || []).filter((m) => new Date(m.start).getTime() > Date.now()).length;
 
   return (
     <div>
@@ -337,13 +272,16 @@ export default function Meetings({
           through. The `title` prop still exists for the legacy /meetings
           deep link that carries no sidebar entry (and so no header icon). */}
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <p className="text-base font-semibold tracking-wide animate-fade-up" style={{ color: 'var(--ink-2)' }}>
-          {description}
-          {upcomingOnly && <> · <span className="font-semibold">Showing upcoming only</span></>}
-          {total > 0 && (
-            <> · <span className="text-lime-600 dark:text-lime-400 font-semibold">{upcomingCount} upcoming</span></>
-          )}
-          {refreshing && !loading && <span className="font-normal text-xs text-mute ml-2">Refreshing…</span>}
+        <p className="text-base font-semibold tracking-wide animate-fade-up flex items-center gap-2 flex-wrap" style={{ color: 'var(--ink-2)' }}>
+          <span>
+            {description}
+            {upcomingOnly && <> · <span className="font-semibold">Showing upcoming only</span></>}
+            {total > 0 && (
+              <> · <span className="text-lime-600 dark:text-lime-400 font-semibold">{upcomingCount} upcoming</span></>
+            )}
+            {refreshing && !loading && <span className="font-normal text-xs text-mute ml-2">Refreshing…</span>}
+          </span>
+          {usingDemo && <span className="overview-demo-pill">Demo data</span>}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           <label className="flex items-center gap-2 text-sm text-mute cursor-pointer">
@@ -367,16 +305,16 @@ export default function Meetings({
         </div>
       )}
 
-      <div className="mt-6 grid lg:grid-cols-[360px_1fr] gap-6">
+      <div className="mt-6 grid lg:grid-cols-[420px_1fr] gap-6">
         {/* === LEFT: month calendar ============================================ */}
         <div className="relative">
           <div ref={calendarSentinel} className="absolute top-0 left-0 h-px w-px" aria-hidden="true" />
           <div className="lg:sticky lg:top-20 lg:self-start">
-            <div className={`transition-shadow duration-300 ease-out rounded-xl ${calendarStuck ? 'shadow-lg' : 'shadow-none'}`}>
-              <MonthCalendar
+            <div className={`form-card border-lime-200 dark:border-lime-500/30 transition-shadow duration-300 ease-out ${calendarStuck ? 'shadow-lg' : 'shadow-none'}`}>
+              <InteractiveCalendar
                 month={month}
-                onPrev={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-                onNext={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                onPrevMonth={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                onNextMonth={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
                 onToday={() => {
                   const n = new Date();
                   setMonth(new Date(n.getFullYear(), n.getMonth(), 1));
@@ -384,6 +322,13 @@ export default function Meetings({
                 meetingsByDay={meetingsByDay}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
+                renderMeeting={(m) => ({
+                  date: fmtDateLong(m.start),
+                  time: `${fmtTime(m.start)}${m.end ? ` – ${fmtTime(m.end)}` : ''}`,
+                  title: m.name || 'Unnamed booking',
+                  participants: [m.email, m.phone].filter(Boolean),
+                  location: m.calendar_link ? 'Google Calendar' : (m.notes ? m.notes.slice(0, 40) : ''),
+                })}
               />
               {selectedDay && (
                 <button

@@ -3,9 +3,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Mic, ChevronRight, ChevronDown, IdCard, BookOpen, Target,
   Circle, CheckCircle2, Check, Database, X, Lock, Puzzle, FileEdit, Sparkles,
+  Upload, Loader2,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
-import { api } from '../../api.js';
+import { api, getToken } from '../../api.js';
 import { readCache, writeCache } from '../../utils/swrCache.js';
 import { VOICES, LANGUAGES, gradientFor, statusMeta } from './KbAgent.jsx';
 import { TEMPLATES } from './Templates.jsx';
@@ -282,6 +283,9 @@ export default function AgentDetail() {
   const [importBusy, setImportBusy] = useState(false);
   const [importErr, setImportErr] = useState('');
   const [importPreview, setImportPreview] = useState(null);
+  // File import (PDF / DOCX / CSV) — same preview-before-apply flow as the
+  // website importer, via /api/kb/import-from-file.
+  const [importFile, setImportFile] = useState(null);
 
   // "Import from knowledge base" is a chooser — import from a website (real,
   // AI-extracted) or apply one of the reusable templates saved on the
@@ -421,6 +425,35 @@ export default function AgentDetail() {
       .finally(() => setImportBusy(false));
   };
 
+  const runFileImport = async () => {
+    if (!importFile) return;
+    setImportBusy(true);
+    setImportErr('');
+    setImportPreview(null);
+    try {
+      const body = new FormData();
+      body.append('file', importFile);
+      const token = getToken();
+      const res = await fetch('/api/kb/import-from-file', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setImportPreview({
+        kbCompany: data.kbCompany || '',
+        kbFaqs:    data.kbFaqs    || '',
+        url:       data.fileName  || importFile.name,
+        faqCount:  data.faqCount  || 0,
+      });
+    } catch (e) {
+      setImportErr(e.message || 'Could not import that file');
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   if (loaded && !selected) {
     return (
       <div>
@@ -549,7 +582,7 @@ export default function AgentDetail() {
                 <button
                   type="button"
                   className="btn-teal text-sm whitespace-nowrap inline-flex items-center gap-1.5"
-                  onClick={() => { setImporting(true); setImportErr(''); setImportPreview(null); setImportUrl(''); }}
+                  onClick={() => { setImporting(true); setImportErr(''); setImportPreview(null); setImportUrl(''); setImportFile(null); }}
                 >
                   <Globe size={14} /> Import from website
                 </button>
@@ -736,18 +769,18 @@ export default function AgentDetail() {
           review before it lands in the draft (still needs Save to persist). */}
       {importing && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 backdrop-blur-sm px-4 py-10 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-xl bg-white border border-slate-200 shadow-xl p-6">
+          <div className="w-full max-w-2xl rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-lg font-bold inline-flex items-center gap-2"><Globe size={18} /> Build knowledge base from your website</div>
+                <div className="text-lg font-bold inline-flex items-center gap-2 text-[var(--foreground)]"><Globe size={18} /> Build knowledge base from your website</div>
                 <p className="text-xs text-mute mt-1">
-                  Paste your homepage URL. We'll read it, extract the most receptionist-relevant facts, and generate
-                  Company info + FAQs you can review before saving.
+                  Paste your homepage URL, or upload a PDF, DOCX, or CSV file. We'll read it, extract the most
+                  receptionist-relevant facts, and generate Company info + FAQs you can review before saving.
                 </p>
               </div>
               <button
-                onClick={() => !importBusy && setImporting(false)}
-                className="text-mute hover:text-[var(--ink)]"
+                onClick={() => { if (!importBusy) { setImporting(false); setImportFile(null); } }}
+                className="text-mute hover:text-[var(--foreground)]"
                 aria-label="Close"
               >
                 <X size={20} />
@@ -767,8 +800,33 @@ export default function AgentDetail() {
               Single-page fetch — works best on a homepage or "About" page that already names your services / hours / location.
             </div>
 
+            <label className="field-label mt-4">Or upload a file</label>
+            <div className="flex gap-2">
+              <label className="input text-sm text-mute flex items-center cursor-pointer overflow-hidden">
+                <span className="truncate">{importFile ? importFile.name : 'Choose a PDF, DOCX, or CSV…'}</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.csv"
+                  className="hidden"
+                  disabled={importBusy}
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={runFileImport}
+                disabled={importBusy || !importFile}
+                className="btn-ghost text-sm px-3 whitespace-nowrap inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {importBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Import
+              </button>
+            </div>
+            <div className="field-help">
+              Product lists, FAQ sheets, service menus — PDF, DOCX, or CSV, up to 15 MB.
+            </div>
+
             {importErr && (
-              <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{importErr}</div>
+              <div className="mt-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{importErr}</div>
             )}
 
             {importPreview && (
@@ -778,7 +836,7 @@ export default function AgentDetail() {
                   <div className="text-[11px] uppercase tracking-wider text-mute font-semibold mb-1">
                     Company info ({importPreview.kbCompany.length.toLocaleString()} chars)
                   </div>
-                  <pre className="text-xs whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded p-3 max-h-48 overflow-y-auto">
+                  <pre className="text-xs whitespace-pre-wrap bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] rounded p-3 max-h-48 overflow-y-auto">
                     {importPreview.kbCompany || '(empty)'}
                   </pre>
                 </div>
@@ -786,7 +844,7 @@ export default function AgentDetail() {
                   <div className="text-[11px] uppercase tracking-wider text-mute font-semibold mb-1">
                     FAQs ({importPreview.faqCount} Q&amp;A pairs)
                   </div>
-                  <pre className="text-xs whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded p-3 max-h-48 overflow-y-auto">
+                  <pre className="text-xs whitespace-pre-wrap bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] rounded p-3 max-h-48 overflow-y-auto">
                     {importPreview.kbFaqs || '(no FAQs extracted)'}
                   </pre>
                 </div>
@@ -799,14 +857,14 @@ export default function AgentDetail() {
             <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
               {!importPreview ? (
                 <>
-                  <button type="button" className="btn-ghost text-sm" onClick={() => setImporting(false)} disabled={importBusy}>Cancel</button>
+                  <button type="button" className="btn-ghost text-sm" onClick={() => { setImporting(false); setImportFile(null); }} disabled={importBusy}>Cancel</button>
                   <button type="button" onClick={runImport} disabled={importBusy || !importUrl.trim()} className="btn-teal text-sm disabled:opacity-50">
                     {importBusy ? 'Reading site…' : 'Extract knowledge base'}
                   </button>
                 </>
               ) : (
                 <>
-                  <button type="button" className="btn-ghost text-sm" onClick={() => setImporting(false)}>Close (don't import)</button>
+                  <button type="button" className="btn-ghost text-sm" onClick={() => { setImporting(false); setImportFile(null); }}>Close (don't import)</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -861,7 +919,7 @@ export default function AgentDetail() {
                   type="button"
                   className="w-full flex items-start gap-3 p-3 rounded-xl border text-left hover:bg-[var(--surface-2)]"
                   style={{ borderColor: 'var(--line)' }}
-                  onClick={() => { setSourcePicker(false); setImporting(true); setImportErr(''); setImportPreview(null); setImportUrl(''); }}
+                  onClick={() => { setSourcePicker(false); setImporting(true); setImportErr(''); setImportPreview(null); setImportUrl(''); setImportFile(null); }}
                 >
                   <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--surface-tint)' }}>
                     <Globe size={16} style={{ color: 'var(--primary)' }} />

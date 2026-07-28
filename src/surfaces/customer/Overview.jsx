@@ -2,47 +2,14 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
-  BookOpen,
   Bot,
   CreditCard,
   Phone,
-  Rocket,
   TrendingUp,
   Wallet,
-  Wand,
   Zap,
 } from 'lucide-react';
 import { useApp } from '../../AppContext.jsx';
-
-// "How it works" steps — same three-step framing as the marketing site
-// (9278.ai), pointed at the actual in-app pages so each card doubles as a
-// shortcut for a customer who hasn't finished onboarding.
-const HOW_IT_WORKS = [
-  {
-    step: '01',
-    icon: Wand,
-    title: 'Design your agent',
-    description: 'Pick a voice, write the prompt, set guardrails. Describe the agent in plain English and ship it.',
-    points: ['System prompt + personas', 'Guardrails and conversation flow', 'Plain-English agent definition'],
-    to: '/dashboard/agents',
-  },
-  {
-    step: '02',
-    icon: BookOpen,
-    title: 'Connect your knowledge',
-    description: 'Point the agent at your knowledge base, FAQs, or product docs. It answers from your source of truth, not a generic model.',
-    points: ['RAG over your knowledge base', 'Live document sync', 'Source citations on every answer'],
-    to: '/dashboard/kb',
-  },
-  {
-    step: '03',
-    icon: Rocket,
-    title: 'Launch & scale',
-    description: 'Plug in your phone number, route inbound or outbound, and go live. Scale from one call to thousands without a queue.',
-    points: ['Phone number routing (inbound + outbound)', 'Real-time latency tracking'],
-    to: '/dashboard/numbers',
-  },
-];
 
 const CALL_VOLUME = [
   { day: '12', value: 2 },
@@ -115,47 +82,6 @@ export default function Overview() {
           <h2>Your numbers, call activity, and quick actions at a glance.</h2>
         </div>
         {demoMode && <span className="overview-demo-pill">Demo data</span>}
-      </section>
-
-      <section className="overview-card">
-        <div className="overview-card-head">
-          <div>
-            <p className="overview-label">How it works</p>
-            <h3>From idea to live agent in three steps.</h3>
-          </div>
-        </div>
-        <p className="text-sm text-[var(--body)] -mt-2 mb-4 max-w-2xl">
-          No infra to spin up, no models to host. Design, connect, and launch — your first agent can be taking calls today.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {HOW_IT_WORKS.map(({ step, icon: Icon, title, description, points, to }) => (
-            <Link
-              key={step}
-              to={to}
-              className="group relative flex flex-col rounded-2xl border border-[rgba(59,130,246,0.22)] bg-[linear-gradient(180deg,rgba(4,107,210,0.10),rgba(255,255,255,0.03))] p-5 transition duration-200 ease-out hover:border-[rgba(59,130,246,0.45)] hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-3xl font-extrabold text-blue-500/25 leading-none">{step}</span>
-                <span className="w-9 h-9 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
-                  <Icon size={16} />
-                </span>
-              </div>
-              <h4 className="mt-3 font-bold text-[var(--foreground)]">{title}</h4>
-              <p className="mt-1.5 text-xs leading-relaxed text-[var(--body)]">{description}</p>
-              <ul className="mt-3 space-y-1.5">
-                {points.map((p) => (
-                  <li key={p} className="flex items-start gap-2 text-xs text-[var(--body)]">
-                    <span className="mt-1.5 w-1 h-1 rounded-full bg-blue-400 shrink-0" />
-                    {p}
-                  </li>
-                ))}
-              </ul>
-              <span className="mt-auto pt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                Go there <ArrowRight size={12} />
-              </span>
-            </Link>
-          ))}
-        </div>
       </section>
 
       <section className="overview-banner">

@@ -4575,10 +4575,14 @@ app.post('/api/kb/import-from-file', auth, (req, res) => {
                   text = (await pdfParse(req.file.buffer)).text || '';
       } else if (ext === 'docx') {
         text = (await mammoth.extractRawText({ buffer: req.file.buffer })).value || '';
+      } else if (ext === 'csv') {
+        // Already plain text — no parsing library needed, the extraction
+        // prompt reads the raw rows directly (header row + values as-is).
+        text = req.file.buffer.toString('utf8');
       } else if (ext === 'doc') {
         return res.status(415).json({ error: 'Old .doc format isn’t supported — please save as .docx or PDF and try again.' });
       } else {
-        return res.status(415).json({ error: 'Only .pdf and .docx files are supported.' });
+        return res.status(415).json({ error: 'Only .pdf, .docx, and .csv files are supported.' });
       }
     } catch (e) {
       return res.status(422).json({ error: 'Could not read that file: ' + (e.message || 'parse error') });

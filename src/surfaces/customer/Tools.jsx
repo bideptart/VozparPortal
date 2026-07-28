@@ -382,7 +382,7 @@ export default function Tools() {
                       <div className="mt-4">
                         <label className="field-label">Transfer number</label>
                         <div className="flex items-stretch gap-2">
-                          <span className="input w-auto px-3 flex items-center font-mono text-sm bg-slate-50 dark:bg-slate-800 shrink-0">
+                          <span className="input w-auto px-3 flex items-center font-mono text-sm bg-[var(--muted)] text-[var(--foreground)] shrink-0">
                             {COUNTRY_CODE}
                           </span>
                           <input
